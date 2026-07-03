@@ -1,0 +1,180 @@
+[debug] [2026-06-29T01:30:23.517Z] ----------------------------------------------------------------------
+[debug] [2026-06-29T01:30:23.520Z] Command:       /data/data/com.termux/files/usr/bin/node /data/data/com.termux/files/usr/bin/firebase login:ci
+[debug] [2026-06-29T01:30:23.520Z] CLI Version:   15.22.3
+[debug] [2026-06-29T01:30:23.520Z] Platform:      android
+[debug] [2026-06-29T01:30:23.520Z] Node Version:  v26.3.1
+[debug] [2026-06-29T01:30:23.520Z] Detected Agent: unknown
+[debug] [2026-06-29T01:30:23.520Z] Time:          Mon Jun 29 2026 05:30:23 GMT+0400 (Gulf Standard Time)
+[debug] [2026-06-29T01:30:23.520Z] ----------------------------------------------------------------------
+[debug] 
+[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
+[info] 
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=554495454&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+[info] 
+[info] Waiting for authentication...
+[debug] [2026-06-29T01:30:30.051Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:30:30.051Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:30:30.538Z] *** [apiv2] retrying https://accounts.google.com/o/oauth2/token without keep-alive after a premature close error
+[debug] [2026-06-29T01:30:31.542Z] *** [apiv2] Attempting the request again. Attempt number 2
+[debug] [2026-06-29T01:30:31.543Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:30:31.543Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:30:32.109Z] <<< [apiv2][status] POST https://accounts.google.com/o/oauth2/token 400
+[debug] [2026-06-29T01:30:32.109Z] <<< [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:30:32.112Z] Token Fetch Error: FirebaseError: Request to https://accounts.google.com/o/oauth2/token had HTTP Error: 400, invalid_grant
+    at responseToError (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/apiv2.js:381:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-29T01:30:32.122Z] >>> [apiv2][query] POST https://auth.firebase.tools/attest [none]
+[debug] [2026-06-29T01:30:32.123Z] >>> [apiv2][body] POST https://auth.firebase.tools/attest {"session_id":"96d1cb84-c43b-4a50-9737-87b157186358"}
+[debug] [2026-06-29T01:30:32.741Z] <<< [apiv2][status] POST https://auth.firebase.tools/attest 200
+[debug] [2026-06-29T01:30:32.742Z] <<< [apiv2][body] POST https://auth.firebase.tools/attest {"token":"3kgs3z2SzNuxy8aBHy70QzTHHXH0bmnjbAR3l_km2s0"}
+[info] 
+[info] To sign in to the Firebase CLI:
+[info] 
+[info] 1. Take note of your session ID:
+[info] 
+[info]    96D1C
+[info] 
+[info] 2. Visit the URL below on any device and follow the instructions to get your code:
+[info] 
+[info]    https://auth.firebase.tools/login?code_challenge=-PqnKAohp-IxXYXW5y0aFI1JlEBV8sbedAmP4w7JRrE&session=96d1cb84-c43b-4a50-9737-87b157186358&attest=3kgs3z2SzNuxy8aBHy70QzTHHXH0bmnjbAR3l_km2s0
+[info] 
+[info] 3. Paste or enter the authorization code below once you have it:
+[info] 
+[debug] [2026-06-29T01:31:13.319Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:509:20)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:521:24)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:509:20)
+    at addChunk (node:internal/streams/readable:568:12)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-06-29T01:31:27.221Z] ----------------------------------------------------------------------
+[debug] [2026-06-29T01:31:27.223Z] Command:       /data/data/com.termux/files/usr/bin/node /data/data/com.termux/files/usr/bin/firebase login:ci
+[debug] [2026-06-29T01:31:27.223Z] CLI Version:   15.22.3
+[debug] [2026-06-29T01:31:27.223Z] Platform:      android
+[debug] [2026-06-29T01:31:27.223Z] Node Version:  v26.3.1
+[debug] [2026-06-29T01:31:27.223Z] Detected Agent: unknown
+[debug] [2026-06-29T01:31:27.223Z] Time:          Mon Jun 29 2026 05:31:27 GMT+0400 (Gulf Standard Time)
+[debug] [2026-06-29T01:31:27.223Z] ----------------------------------------------------------------------
+[debug] 
+[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
+[info] 
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=253342603&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+[info] 
+[info] Waiting for authentication...
+[debug] [2026-06-29T01:31:34.367Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:31:34.367Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:31:34.828Z] *** [apiv2] retrying https://accounts.google.com/o/oauth2/token without keep-alive after a premature close error
+[debug] [2026-06-29T01:31:35.831Z] *** [apiv2] Attempting the request again. Attempt number 2
+[debug] [2026-06-29T01:31:35.833Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:31:35.834Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:31:36.268Z] <<< [apiv2][status] POST https://accounts.google.com/o/oauth2/token 400
+[debug] [2026-06-29T01:31:36.268Z] <<< [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:31:36.269Z] Token Fetch Error: FirebaseError: Request to https://accounts.google.com/o/oauth2/token had HTTP Error: 400, invalid_grant
+    at responseToError (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/apiv2.js:381:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-29T01:31:36.274Z] >>> [apiv2][query] POST https://auth.firebase.tools/attest [none]
+[debug] [2026-06-29T01:31:36.274Z] >>> [apiv2][body] POST https://auth.firebase.tools/attest {"session_id":"307d396c-f6f6-4d64-a128-ae25aa4396a8"}
+[debug] [2026-06-29T01:31:37.133Z] <<< [apiv2][status] POST https://auth.firebase.tools/attest 200
+[debug] [2026-06-29T01:31:37.134Z] <<< [apiv2][body] POST https://auth.firebase.tools/attest {"token":"DswDTh0b7c7tfqZs3PvmqlUPRXG8fL7kqvdYu9_K5-4"}
+[info] 
+[info] To sign in to the Firebase CLI:
+[info] 
+[info] 1. Take note of your session ID:
+[info] 
+[info]    307D3
+[info] 
+[info] 2. Visit the URL below on any device and follow the instructions to get your code:
+[info] 
+[info]    https://auth.firebase.tools/login?code_challenge=rou3ly-0SRUNknl4lzOlIVfYvXnW7R02FD_Jchn8ReE&session=307d396c-f6f6-4d64-a128-ae25aa4396a8&attest=DswDTh0b7c7tfqZs3PvmqlUPRXG8fL7kqvdYu9_K5-4
+[info] 
+[info] 3. Paste or enter the authorization code below once you have it:
+[info] 
+[debug] [2026-06-29T01:33:15.364Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:509:20)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:521:24)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:509:20)
+    at addChunk (node:internal/streams/readable:568:12)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-06-29T01:33:45.779Z] ----------------------------------------------------------------------
+[debug] [2026-06-29T01:33:45.783Z] Command:       /data/data/com.termux/files/usr/bin/node /data/data/com.termux/files/usr/bin/firebase login:ci
+[debug] [2026-06-29T01:33:45.783Z] CLI Version:   15.22.3
+[debug] [2026-06-29T01:33:45.783Z] Platform:      android
+[debug] [2026-06-29T01:33:45.783Z] Node Version:  v26.3.1
+[debug] [2026-06-29T01:33:45.783Z] Detected Agent: unknown
+[debug] [2026-06-29T01:33:45.783Z] Time:          Mon Jun 29 2026 05:33:45 GMT+0400 (Gulf Standard Time)
+[debug] [2026-06-29T01:33:45.784Z] ----------------------------------------------------------------------
+[debug] 
+[warn] ⚠  Authenticating with a `login:ci` token is deprecated and will be removed in a future major version of `firebase-tools`. Instead, use a service account key with `GOOGLE_APPLICATION_CREDENTIALS`: https://cloud.google.com/docs/authentication/getting-started 
+[info] 
+[info] Visit this URL on this device to log in:
+[info] https://accounts.google.com/o/oauth2/auth?client_id=563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com&scope=email%20openid%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloudplatformprojects.readonly%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Ffirebase%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform&response_type=code&state=711994268&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+[info] 
+[info] Waiting for authentication...
+[debug] [2026-06-29T01:33:52.769Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:33:52.769Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:33:53.266Z] *** [apiv2] retrying https://accounts.google.com/o/oauth2/token without keep-alive after a premature close error
+[debug] [2026-06-29T01:33:54.270Z] *** [apiv2] Attempting the request again. Attempt number 2
+[debug] [2026-06-29T01:33:54.271Z] >>> [apiv2][query] POST https://accounts.google.com/o/oauth2/token [none]
+[debug] [2026-06-29T01:33:54.271Z] >>> [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:33:54.725Z] <<< [apiv2][status] POST https://accounts.google.com/o/oauth2/token 400
+[debug] [2026-06-29T01:33:54.726Z] <<< [apiv2][body] POST https://accounts.google.com/o/oauth2/token [omitted]
+[debug] [2026-06-29T01:33:54.729Z] Token Fetch Error: FirebaseError: Request to https://accounts.google.com/o/oauth2/token had HTTP Error: 400, invalid_grant
+    at responseToError (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/lib/apiv2.js:381:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] Authentication Error: Your credentials are no longer valid. Please run firebase login --reauth
+
+For CI servers and headless environments, generate a new token with firebase login:ci
+[debug] [2026-06-29T01:33:54.739Z] >>> [apiv2][query] POST https://auth.firebase.tools/attest [none]
+[debug] [2026-06-29T01:33:54.740Z] >>> [apiv2][body] POST https://auth.firebase.tools/attest {"session_id":"e65020c2-ea74-4d86-9b3e-76b624645195"}
+[debug] [2026-06-29T01:33:55.299Z] <<< [apiv2][status] POST https://auth.firebase.tools/attest 200
+[debug] [2026-06-29T01:33:55.299Z] <<< [apiv2][body] POST https://auth.firebase.tools/attest {"token":"ELAjVkXfrIZiTywpxxiR_h7vyBHVJQ_8XIEapeJrmvk"}
+[info] 
+[info] To sign in to the Firebase CLI:
+[info] 
+[info] 1. Take note of your session ID:
+[info] 
+[info]    E6502
+[info] 
+[info] 2. Visit the URL below on any device and follow the instructions to get your code:
+[info] 
+[info]    https://auth.firebase.tools/login?code_challenge=smV-LjhDvCfxcZ54woS8bw3Oi8Bz-MZW3MBbJPbY3Jc&session=e65020c2-ea74-4d86-9b3e-76b624645195&attest=ELAjVkXfrIZiTywpxxiR_h7vyBHVJQ_8XIEapeJrmvk
+[info] 
+[info] 3. Paste or enter the authorization code below once you have it:
+[info] 
+[debug] [2026-06-29T01:48:55.408Z] ExitPromptError: User force closed the prompt with SIGINT
+    at Interface.sigint (/data/data/com.termux/files/usr/lib/node_modules/firebase-tools/node_modules/@inquirer/core/dist/commonjs/lib/create-prompt.js:101:37)
+    at Interface.emit (node:events:509:20)
+    at [_ttyWrite] [as _ttyWrite] (node:internal/readline/interface:1327:18)
+    at ReadStream.onkeypress (node:internal/readline/interface:284:20)
+    at ReadStream.emit (node:events:521:24)
+    at emitKeys (node:internal/readline/utils:371:14)
+    at emitKeys.next (<anonymous>)
+    at ReadStream.onData (node:internal/readline/emitKeypressEvents:64:36)
+    at ReadStream.emit (node:events:509:20)
+    at addChunk (node:internal/streams/readable:568:12)
+[error] 
+[error] Error: An unexpected error has occurred.

@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user profile information.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "phone": { "type": "string" },
+        "addresses": { "type": "array", "items": { "type": "object" } },
+        "paymentMethods": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin", "store_manager"], "description": "User role. Cannot be modified by users themselves." }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin Record",
+      "description": "Used to verify super-admin status",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "Store": {
+      "title": "Store",
+      "description": "A store entity used for filtering and aggregation.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "disabled"] },
+        "apiUrl": { "type": "string" },
+        "apiKey": { "type": "string" },
+        "supportedLanguages": { "type": "array", "items": { "type": "string" } },
+        "productTypes": { "type": "array", "items": { "type": "string", "enum": ["new", "used", "both"] } },
+        "type": { "type": "string", "enum": ["marketplace", "local", "affiliate", "used"] },
+        "priority": { "type": "number" },
+        "clicks": { "type": "number" },
+        "searches": { "type": "number" },
+        "productsImported": { "type": "number" },
+        "activeUsers": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "logo", "status", "type", "priority", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A product listed by a user for sale.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "sellerId": { "type": "string", "description": "The user ID of the seller" },
+        "createdAt": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "isNew": { "type": "boolean" }
+      },
+      "required": ["name", "price", "description", "category", "images", "sellerId", "createdAt", "rating", "reviews", "isNew"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document."
+    },
+    "/admins/{userId}": {
+      "schema": "Admin",
+      "description": "Admin rights document."
+    },
+    "/stores/{storeId}": {
+      "schema": "Store",
+      "description": "Store documents for dynamic marketplace management."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Products available for sale."
+    }
+  }
+}

@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             data.keys().size() == 2 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 255 &&
+             data.createdAt == request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      // Let's use basic isSignedIn for now since they just created the account and email_verified might be false
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming(), userId);
+      
+      // Update rule (only if they actually need to upate anything, but currently user only has email/createdAt)
+      allow update: if isOwner(userId) && isValidId(userId) && (
+        incoming().diff(existing()).affectedKeys().hasOnly([]) // immutable for now
+      ) && incoming().createdAt == existing().createdAt
+        && incoming().email == existing().email;
+    }
+  }
+}

@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || request.auth.token.email == 'admin@jaknooma.com' || request.auth.token.email == 'dark.habib84@gmail.com');
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             (data.keys().size() == 2 || (data.keys().size() == 3 && data.keys().hasAll(['role']) && data.role in ['user', 'admin', 'store_manager'])) &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 255 &&
+             data.createdAt == request.time;
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email']) &&
+             data.keys().size() == 1 &&
+             data.email is string;
+    }
+
+    function isValidStore(data) {
+      return data.keys().hasAll(['name', 'logo', 'status', 'type', 'priority', 'createdAt', 'updatedAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.logo is string && data.logo.size() <= 1000 &&
+             data.status in ['active', 'disabled'] &&
+             data.type in ['marketplace', 'local', 'affiliate', 'used', 'amazon', 'shein', 'temu', 'dubizzle', 'aliexpress', 'other'] &&
+             data.priority is number &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             data.get('apiUrl', '') is string &&
+             data.get('apiKey', '') is string &&
+             data.get('supportedLanguages', []) is list &&
+             data.get('productTypes', []) is list &&
+             data.get('clicks', 0) is number &&
+             data.get('searches', 0) is number &&
+             data.get('productsImported', 0) is number &&
+             data.get('activeUsers', 0) is number;
+    }
+
+    function isValidProduct(data, userId) {
+      return data.keys().hasAll(['name', 'price', 'description', 'category', 'images', 'sellerId', 'createdAt', 'rating', 'reviews', 'isNew']) &&
+             (data.keys().size() == 10 || (data.keys().size() == 11 && data.keys().hasAll(['storeId']) && (data.storeId is string || data.storeId == null))) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.description is string && data.description.size() <= 2000 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.images is list && data.images.size() > 0 && data.images.size() <= 10 &&
+             (data.images.size() == 0 || data.images[0] is string) &&
+             data.sellerId == userId &&
+             data.createdAt == request.time &&
+             data.rating is number && data.rating >= 0 && data.rating <= 5 &&
+             data.reviews is number && data.reviews >= 0 &&
+             data.isNew is bool;
+    }
+
+    function isValidReview(data, userId) {
+      return data.keys().hasAll(['productId', 'userId', 'userName', 'text', 'rating', 'createdAt']) &&
+             data.keys().size() == 6 &&
+             data.productId is string && data.productId.size() > 0 &&
+             data.userId == userId &&
+             data.userName is string && data.userName.size() > 0 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.createdAt == request.time;
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      
+      allow update: if isOwner(userId) && isValidId(userId) && (
+        incoming().diff(existing()).affectedKeys().hasOnly([]) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role']))
+      );
+
+      match /wishlists/{productId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && 
+          incoming().keys().hasAll(['productId', 'addedAt']) &&
+          incoming().keys().size() == 2 &&
+          incoming().productId == productId &&
+          incoming().addedAt == request.time;
+        allow delete: if isOwner(userId);
+      }
+    }
+    
+    match /admins/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow create: if isOwner(userId) && isValidAdmin(incoming()) && incoming().email == request.auth.token.email && request.auth.token.email_verified;
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(storeId) && isValidStore(incoming());
+      allow update: if isAdmin() && isValidId(storeId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'logo', 'status', 'apiUrl', 'apiKey', 'supportedLanguages', 'productTypes', 'type', 'priority', 'clicks', 'searches', 'productsImported', 'activeUsers', 'updatedAt']) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(storeId);
+    }
+
+    match /products/{productId} {
+      allow read: if true; // Products are public read
+      allow create: if isSignedIn() && isValidId(productId) && isValidProduct(incoming(), request.auth.uid);
+      allow update: if isSignedIn() && isValidId(productId) && existing().sellerId == request.auth.uid && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'price', 'description', 'category', 'images'])
+      ) && incoming().sellerId == existing().sellerId 
+        && incoming().createdAt == existing().createdAt
+        && incoming().rating == existing().rating
+        && incoming().reviews == existing().reviews
+        && incoming().isNew == existing().isNew;
+      allow delete: if isSignedIn() && isValidId(productId) && existing().sellerId == request.auth.uid;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidReview(incoming(), request.auth.uid) && exists(/databases/$(database)/documents/products/$(incoming().productId));
+      allow delete: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+    }
+    
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+  }
+}
