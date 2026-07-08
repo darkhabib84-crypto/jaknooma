@@ -12,6 +12,6 @@ jobs:
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JAKNOOMA }}' # سأخبرك بكيفية استخراجه إن احتجت
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' # سأخبرك بكيفية استخراجه إن احتجت
           channelId: live
           projectId: jaknooma # اسم مشروعك في فايربيس
