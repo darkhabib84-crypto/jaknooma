@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Flame, Server, Shield, Trash2, Play } from 'lucide-react';
 // تأكد من تعديل مسار استيراد ملف إعدادات الفايربيس الخاص بمشروعك
-import { db } from '../firebase/config'; 
+import { db } from '../../lib/firebase'; 
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 export default function AdminSearch() {
