@@ -115,6 +115,7 @@ function AppContent() {
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="search" element={<AdminSearch />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="languages" element={<AdminSettings />} />
         </Route>
       </Routes>
       <Toaster position="bottom-center" toastOptions={{ style: { background: '#111', color: '#fff', borderRadius: '100px', fontSize: '14px', fontWeight: '500' } }} />
