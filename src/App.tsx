@@ -4,7 +4,8 @@
  */
 
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, useNavigate, Outlet } from 'react-router-dom';
+// تمت إزالة BrowserRouter من الاستيراد لأنه أصبح الآن في main.tsx
+import { Routes, Route, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import './lib/i18n';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -58,7 +59,7 @@ function MainLayout() {
 }
 
 function AppContent() {
-  // تفعيل التتبع التلقائي لجميع المسارات داخل موقعك
+  // الآن سيعمل هذا الهوك بأمان تام لأن التطبيق بالكامل مغلف بـ BrowserRouter في ملف main.tsx
   usePageTracking();
 
   useEffect(() => {
@@ -80,7 +81,7 @@ function AppContent() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <> {/* تم استبدال BrowserRouter بـ React Fragment لأن التغليف أصبح في ملف main.tsx */}
       <ScrollToTop />
       <Routes>
         {/* المسارات الرئيسية مع الـ Layout */}
@@ -125,7 +126,7 @@ function AppContent() {
         </Route>
       </Routes>
       <Toaster position="bottom-center" toastOptions={{ style: { background: '#111', color: '#fff', borderRadius: '100px', fontSize: '14px', fontWeight: '500' } }} />
-    </BrowserRouter>
+    </>
   );
 }
 
