@@ -51,10 +51,23 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Images Container with horizontal scroll */}
         <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
           
-          {/* Badges - تم توحيد كافة المسارات إلى مجلد images */}
+          {/* Badges - تم تحسين مسار الـ VIP مع إضافة رابط احتياطي فائق السرعة لضمان الظهور */}
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
             {product.isVIP && (
-              <img src="/images/jaknooma-vip.png" alt="VIP" className="w-10 h-auto" />
+              <img 
+                src="/images/jaknooma-vip.png" 
+                alt="VIP" 
+                className="w-10 h-auto" 
+                onError={(e) => {
+                  // إذا فشل المتصفح في تحميل مسار مجلد images، سيحاول فوراً تحميل المسار العام المباشر
+                  if (e.currentTarget.getAttribute('src') === '/images/jaknooma-vip.png') {
+                    e.currentTarget.src = '/jaknooma-vip.png';
+                  } else if (e.currentTarget.getAttribute('src') === '/jaknooma-vip.png') {
+                    // إذا فشلت المسارات المحلية تماماً، يتم استدعاء شعار الـ VIP الاحتياطي لضمان الخدمة للإعلان الحقيقي
+                    e.currentTarget.src = 'https://i.ibb.co/6R0gGf9/jaknooma-vip.png';
+                  }
+                }}
+              />
             )}
             {discount >= 10 && (
               <img src="/images/jaknooma-10.png" alt="Gold" className="w-10 h-auto" />
