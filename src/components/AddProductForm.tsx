@@ -18,6 +18,7 @@ export default function AddProductForm() {
   const [discountType, setDiscountType] = useState('none');
   const [condition, setCondition] = useState('New');
   const [phone, setPhone] = useState('');
+  const [location, setLocation] = useState(''); // حقل الموقع الجديد
   const [affiliateLink, setAffiliateLink] = useState('');
   const [isVip, setIsVip] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -25,15 +26,15 @@ export default function AddProductForm() {
   
   // New fields for external store and logo
   const [externalStoreLink, setExternalStoreLink] = useState('');
-  const [selectedStore, setSelectedStore] = useState(''); // To store selected store ID
-  const [stores, setStores] = useState<any[]>([]); // State for storing stores fetched from Firestore
+  const [selectedStore, setSelectedStore] = useState(''); 
+  const [stores, setStores] = useState<any[]>([]); 
   const [isLoadingStores, setIsLoadingStores] = useState(true);
   
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch stores from Firebase when component mounts
+  // Fetch stores from Firebase
   useEffect(() => {
     const fetchStores = async () => {
       try {
@@ -73,6 +74,7 @@ export default function AddProductForm() {
     e.preventDefault();
     if (!user) return toast.error('Please log in first');
     if (filesToUpload.length === 0) return toast.error('Please select at least one product image');
+    if (!location.trim()) return toast.error('Please specify your location');
 
     setIsSubmitting(true);
     try {
@@ -92,12 +94,14 @@ export default function AddProductForm() {
         subCategory: selectedSubCategory,
         images: imageUrls,
         sellerId: user.uid,
-        createdAt: serverTimestamp(),
+        sellerName: user.displayName || user.email?.split('@')[0] || 'Anonymous Seller', // حفظ اسم البائع
+        location: location, // حفظ الموقع المحدد
+        createdAt: serverTimestamp(), // التاريخ الفعلي لوضع الإعلان
         discountType,
         condition,
         phone,
         affiliateLink,
-        isVip: false, // Always starts as false until payment is confirmed
+        isVip: false, 
         rating: 0,
         reviews: 0,
         isNew: condition === 'New',
@@ -217,12 +221,22 @@ export default function AddProductForm() {
         </select>
       )}
       
-      <input 
-        type="tel" 
-        placeholder="Phone Number" 
-        className="w-full p-4 border rounded-2xl text-left" 
-        onChange={e => setPhone(e.target.value)} 
-      />
+      <div className="grid grid-cols-2 gap-4">
+        <input 
+          type="tel" 
+          placeholder="Phone Number" 
+          className="p-4 border rounded-2xl text-left" 
+          onChange={e => setPhone(e.target.value)} 
+        />
+        {/* حقل إدخال الموقع الجديد */}
+        <input 
+          type="text" 
+          placeholder="Location (e.g. Dubai, UAE)" 
+          className="p-4 border rounded-2xl text-left" 
+          onChange={e => setLocation(e.target.value)}
+          required 
+        />
+      </div>
 
       {/* ================= External Store Section ================= */}
       <div className="p-5 border border-gray-200 rounded-2xl bg-gray-50/50 space-y-4">
