@@ -51,11 +51,17 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Images Container with horizontal scroll */}
         <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
           
-          {/* Badges */}
+          {/* Badges - تم توحيد كافة المسارات إلى مجلد images */}
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
-            {product.isVIP && <img src="/jaknooma-vip.png" alt="VIP" className="w-10 h-auto" />}
-            {discount >= 10 && <img src="/jaknooma-10.png" alt="Gold" className="w-10 h-auto" />}
-            {discount > 0 && discount < 10 && <img src="/jaknooma-5.png" alt="Silver" className="w-10 h-auto" />}
+            {product.isVIP && (
+              <img src="/images/jaknooma-vip.png" alt="VIP" className="w-10 h-auto" />
+            )}
+            {discount >= 10 && (
+              <img src="/images/jaknooma-10.png" alt="Gold" className="w-10 h-auto" />
+            )}
+            {discount > 0 && discount < 10 && (
+              <img src="/images/jaknooma-5.png" alt="Silver" className="w-10 h-auto" />
+            )}
           </div>
 
           {/* Multiple Images Slider */}
