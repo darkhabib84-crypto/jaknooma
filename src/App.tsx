@@ -34,6 +34,9 @@ import ApiMonitoring from './components/admin/ApiMonitoring';
 import ProductDetails from './pages/ProductDetails';
 import Checkout from './pages/Checkout';
 
+// استيراد الـ Hook المخصص لتتبع زوار موقعك "Jaknooma"
+import { usePageTracking } from './hooks/usePageTracking';
+
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -55,6 +58,9 @@ function MainLayout() {
 }
 
 function AppContent() {
+  // تفعيل التتبع التلقائي لجميع المسارات داخل موقعك
+  usePageTracking();
+
   useEffect(() => {
     // منطق تسجيل الدخول بالرابط (تم تركه كما هو)
     if (isSignInWithEmailLink(auth, window.location.href)) {
@@ -145,4 +151,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
