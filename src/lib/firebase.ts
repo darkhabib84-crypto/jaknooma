@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics } from 'firebase/analytics'; // 1. استيراد Analytics
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSFDoE6Fuyv3eKR6GrKxISXOIE9Om48LQ",
@@ -10,7 +11,7 @@ const firebaseConfig = {
   storageBucket: "jaknooma.firebasestorage.app",
   messagingSenderId: "215148796185",
   appId: "1:215148796185:web:ccd43a8a17896d02eb4d88",
-  measurementId: "G-GGBN015JJZ"
+  measurementId: "G-GGBN015JJZ" // معرف القياس جاهز وموجود بالفعل لديك ✓
 };
 
 // التهيئة الأساسية
@@ -18,6 +19,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// 2. تهيئة وتصدير Analytics للعمل في البيئات التي تدعم المتصفح
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
 // قمنا بفصل الـ Enum ليكون تصديراً نظيفاً
 export enum OperationType {
@@ -35,7 +39,7 @@ interface FirestoreErrorInfo {
   operationType: OperationType;
   path: string | null;
   authInfo: {
-    userId: string | null; // عدلناها لتكون آمنة
+    userId: string | null; 
     email: string | null;
     emailVerified: boolean | null;
     isAnonymous: boolean | null;
@@ -70,7 +74,4 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   
   console.error('Firestore Error Detailed Info:', errInfo);
-  // قمنا بحذف JSON.stringify لتسهيل قراءة الكونسول،
-  // وحذف throw Error لمنع إيقاف التطبيق، إلا إذا كنت تريد ذلك.
 }
-
