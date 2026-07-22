@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, MapPin, User, Calendar, ExternalLink } from 'lucide-react';
+import { MapPin, User, Calendar, Phone } from 'lucide-react';
 
 export interface Product {
   id: string;
@@ -10,7 +10,7 @@ export interface Product {
   images: string[];
   isVIP?: boolean;
   externalUrl?: string;
-  affiliateLink?: string; // حقل رابط العمولة
+  affiliateLink?: string;
   sellerPhone?: string;
   phone?: string;
   discountPercent?: number;
@@ -31,16 +31,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   const originalPrice = Number(product.price || 0);
   const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : originalPrice;
   
-  // تحديد رمز/اسم العملة (افتراضياً AED في حال عدم وجودها)
   const currencySymbol = product.currency || 'AED';
-
-  // الرابط الخاص بالشراء (إما رابط العمولة أو الرابط الخارجي)
-  const buyUrl = product.affiliateLink || product.externalUrl;
-  
-  // رقم الهاتف للتواصل
   const phoneNumber = product.sellerPhone || product.phone;
 
-  // دالة لتنسيق تاريخ الإعلان بشكل مقروء
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     try {
@@ -56,7 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <div className="group flex flex-col relative w-full bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
+    <div className="group flex flex-col relative w-full bg-white rounded-3xl p-2 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       <Link to={`/product/${product.id}`} className="flex flex-col">
         {/* Images Container */}
         <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
@@ -85,7 +78,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Multiple Images Slider */}
+          {/* Images Slider */}
           {Array.isArray(product.images) && product.images.length > 0 ? (
             <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
               {product.images.map((imgUrl, index) => (
@@ -107,7 +100,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="flex flex-col px-2 mb-2">
           <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
           
-          {/* Price with Currency */}
+          {/* Price */}
           <div className="flex items-center gap-2 mt-1">
             {discount > 0 ? (
               <>
@@ -125,7 +118,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Seller, Location, and Date Info Section */}
+          {/* Details Section */}
           <div className="mt-3 pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-[11px] text-gray-500">
             {/* Seller */}
             <div className="flex items-center gap-1.5">
@@ -143,6 +136,16 @@ export default function ProductCard({ product }: ProductCardProps) {
               </span>
             </div>
 
+            {/* Phone Number Displayed as Plain Text */}
+            {phoneNumber && (
+              <div className="flex items-center gap-1.5">
+                <Phone size={12} className="text-gray-400 shrink-0" />
+                <span className="truncate">
+                  Phone: <strong className="text-gray-700 font-medium">{phoneNumber}</strong>
+                </span>
+              </div>
+            )}
+
             {/* Date */}
             <div className="flex items-center gap-1.5">
               <Calendar size={12} className="text-gray-400 shrink-0" />
@@ -153,33 +156,6 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         </div>
       </Link>
-
-      {/* Action Buttons Section */}
-      <div className="px-1 pb-1 mt-2">
-        {buyUrl ? (
-          /* زر الشراء عبر رابط العمولة / الرابط الخارجي */
-          <a
-            href={buyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-2.5 bg-black text-white text-xs font-bold rounded-full hover:bg-gray-800 transition-all z-10 flex items-center justify-center gap-2 shadow-sm active:scale-95"
-          >
-            <ExternalLink size={14} />
-            Buy Now
-          </a>
-        ) : phoneNumber ? (
-          /* زر التراسل عبر واتساب */
-          <a
-            href={`https://wa.me/${phoneNumber.replace(/\D/g, '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-2.5 bg-[#25D366] text-white text-xs font-bold rounded-full hover:bg-[#1da851] transition-all z-10 flex items-center justify-center gap-2 shadow-sm active:scale-95"
-          >
-            <MessageCircle size={14} />
-            WhatsApp
-          </a>
-        ) : null}
-      </div>
     </div>
   );
 }
