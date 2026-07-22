@@ -11,7 +11,7 @@ import {
   User, 
   MapPin, 
   Calendar, 
-  MessageCircle, 
+  Phone,
   ShoppingCart 
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar'; 
@@ -118,8 +118,8 @@ const ProductDetails = () => {
                 {product.price} {currencySymbol}
               </p>
 
-              {/* قسم بيانات البائع، الموقع، وتاريخ الإعلان */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
+              {/* قسم بيانات البائع، الموقع، رقم الهاتف، وتاريخ الإعلان */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
                 {/* اسم البائع */}
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -132,6 +132,21 @@ const ProductDetails = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* رقم الهاتف للتواصل المباشر (كنص إرشادي للعميل) */}
+                {sellerPhone && (
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <Phone size={18} />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 font-medium">رقم التواصل</span>
+                      <span className="text-sm font-bold text-gray-700 dir-ltr select-all">
+                        {sellerPhone}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* موقع الإعلان */}
                 <div className="flex items-center gap-2.5">
@@ -164,26 +179,17 @@ const ProductDetails = () => {
               <p className="text-gray-600 leading-relaxed mb-8 text-lg">{product.description}</p>
             </div>
             
-            {/* قسم أزرار التفاعل والإجراءات */}
+            {/* قسم أزرار التفاعل (بدون زر الواتساب) */}
             <div className="flex flex-col gap-3">
-              {/* زر الشراء المباشر أو التراسل */}
-              {targetBuyUrl ? (
+              {/* زر الشراء المباشر إذا وُجد رابط متجر/عمولة */}
+              {targetBuyUrl && (
                 <button 
                   onClick={() => window.open(targetBuyUrl, '_blank')} 
                   className="flex items-center justify-center gap-3 w-full py-4 bg-black text-white rounded-2xl font-bold text-lg hover:bg-gray-800 transition-all shadow-lg active:scale-95"
                 >
                   <ExternalLink size={20} /> شراء الآن من المتجر
                 </button>
-              ) : sellerPhone ? (
-                <a 
-                  href={`https://wa.me/${sellerPhone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-3 w-full py-4 bg-[#25D366] text-white rounded-2xl font-bold text-lg hover:bg-[#1da851] transition-all shadow-lg active:scale-95"
-                >
-                  <MessageCircle size={22} /> تواصل عبر واتساب
-                </a>
-              ) : null}
+              )}
 
               {/* زر إضافة للسلة */}
               <button 
