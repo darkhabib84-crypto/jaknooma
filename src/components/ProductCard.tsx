@@ -1,17 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, MapPin, User, Calendar } from 'lucide-react';
+import { MessageCircle, MapPin, User, Calendar, ExternalLink } from 'lucide-react';
 
 export interface Product {
   id: string;
   name: string;
   price: number;
+  currency?: string;
   images: string[];
   isVIP?: boolean;
   externalUrl?: string;
+  affiliateLink?: string; // حقل رابط العمولة
   sellerPhone?: string;
+  phone?: string;
   discountPercent?: number;
-  // الحقول الجديدة التي تم إضافتها لقاعدة البيانات
   location?: string;
   sellerName?: string;
   createdAt?: {
@@ -28,12 +30,20 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discount = product.discountPercent || 0;
   const originalPrice = Number(product.price || 0);
   const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : originalPrice;
+  
+  // تحديد رمز/اسم العملة (افتراضياً AED في حال عدم وجودها)
+  const currencySymbol = product.currency || 'AED';
+
+  // الرابط الخاص بالشراء (إما رابط العمولة أو الرابط الخارجي)
+  const buyUrl = product.affiliateLink || product.externalUrl;
+  
+  // رقم الهاتف للتواصل
+  const phoneNumber = product.sellerPhone || product.phone;
 
   // دالة لتنسيق تاريخ الإعلان بشكل مقروء
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     try {
-      // التعامل مع Timestamp الخاص بـ Firebase
       const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
       return date.toLocaleDateString('en-US', {
         month: 'short',
@@ -48,10 +58,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group flex flex-col relative w-full bg-white rounded-3xl p-2 shadow-sm border border-gray-100">
       <Link to={`/product/${product.id}`} className="flex flex-col">
-        {/* Images Container with horizontal scroll */}
+        {/* Images Container */}
         <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
           
-          {/* Badges - تم تحسين مسار الـ VIP مع إضافة رابط احتياطي فائق السرعة لضمان الظهور */}
+          {/* Badges */}
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
             {product.isVIP && (
               <img 
@@ -59,11 +69,9 @@ export default function ProductCard({ product }: ProductCardProps) {
                 alt="VIP" 
                 className="w-10 h-auto" 
                 onError={(e) => {
-                  // إذا فشل المتصفح في تحميل مسار مجلد images، سيحاول فوراً تحميل المسار العام المباشر
                   if (e.currentTarget.getAttribute('src') === '/images/jaknooma-vip.png') {
                     e.currentTarget.src = '/jaknooma-vip.png';
                   } else if (e.currentTarget.getAttribute('src') === '/jaknooma-vip.png') {
-                    // إذا فشلت المسارات المحلية تماماً، يتم استدعاء شعار الـ VIP الاحتياطي لضمان الخدمة للإعلان الحقيقي
                     e.currentTarget.src = 'https://i.ibb.co/6R0gGf9/jaknooma-vip.png';
                   }
                 }}
@@ -99,15 +107,21 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="flex flex-col px-2 mb-2">
           <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
           
-          {/* Price */}
+          {/* Price with Currency */}
           <div className="flex items-center gap-2 mt-1">
             {discount > 0 ? (
               <>
-                <span className="text-sm font-bold text-red-600">${finalPrice.toFixed(2)}</span>
-                <span className="text-[11px] text-gray-400 line-through">${originalPrice.toFixed(2)}</span>
+                <span className="text-sm font-bold text-red-600">
+                  {finalPrice.toFixed(2)} {currencySymbol}
+                </span>
+                <span className="text-[11px] text-gray-400 line-through">
+                  {originalPrice.toFixed(2)} {currencySymbol}
+                </span>
               </>
             ) : (
-              <span className="text-sm font-semibold text-gray-900">${originalPrice.toFixed(2)}</span>
+              <span className="text-sm font-semibold text-gray-900">
+                {originalPrice.toFixed(2)} {currencySymbol}
+              </span>
             )}
           </div>
 
@@ -140,21 +154,26 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
       </Link>
 
-      {/* Action Buttons */}
+      {/* Action Buttons Section */}
       <div className="px-1 pb-1 mt-2">
-        {product.externalUrl ? (
-          <button
-            onClick={() => window.open(product.externalUrl, '_blank')}
-            className="w-full py-2.5 bg-black text-white text-xs font-bold rounded-full hover:bg-gray-800 transition-colors z-10"
-          >
-            Buy from Store
-          </button>
-        ) : product.sellerPhone ? (
+        {buyUrl ? (
+          /* زر الشراء عبر رابط العمولة / الرابط الخارجي */
           <a
-            href={`https://wa.me/${product.sellerPhone.replace(/\D/g, '')}`}
+            href={buyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2.5 bg-[#25D366] text-white text-xs font-bold rounded-full hover:bg-[#1da851] transition-colors z-10 flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-black text-white text-xs font-bold rounded-full hover:bg-gray-800 transition-all z-10 flex items-center justify-center gap-2 shadow-sm active:scale-95"
+          >
+            <ExternalLink size={14} />
+            Buy Now
+          </a>
+        ) : phoneNumber ? (
+          /* زر التراسل عبر واتساب */
+          <a
+            href={`https://wa.me/${phoneNumber.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 bg-[#25D366] text-white text-xs font-bold rounded-full hover:bg-[#1da851] transition-all z-10 flex items-center justify-center gap-2 shadow-sm active:scale-95"
           >
             <MessageCircle size={14} />
             WhatsApp
