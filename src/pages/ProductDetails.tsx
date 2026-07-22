@@ -88,14 +88,16 @@ const ProductDetails = () => {
   const currencySymbol = product.currency || 'AED';
 
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-white">
-      {/* السايدبار الثابت */}
-      <div className="hidden md:block w-64 border-r border-gray-200 h-full overflow-y-auto">
+    // التعديل هنا: استخدام min-h-screen بدلاً من h-screen وإلغاء overflow-hidden
+    <div className="flex w-full min-h-screen bg-white">
+      
+      {/* السايدبار الثابت أثناء السكرول */}
+      <div className="hidden md:block w-64 border-r border-gray-200 h-screen sticky top-0 shrink-0">
         <Sidebar />
       </div>
 
-      {/* المحتوى الرئيسي القابل للتمرير */}
-      <main className="flex-1 h-full overflow-y-auto p-6 md:p-10" dir="rtl">
+      {/* المحتوى الرئيسي الموحد مع سكرول الصفحة */}
+      <main className="flex-1 p-6 md:p-10" dir="rtl">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium">
           <ArrowLeft size={18} className="rotate-180" /> العودة للتسوق
         </button>
@@ -133,7 +135,7 @@ const ProductDetails = () => {
                   </div>
                 </div>
 
-                {/* رقم الهاتف للتواصل المباشر (كنص إرشادي للعميل) */}
+                {/* رقم الهاتف للتواصل المباشر */}
                 {sellerPhone && (
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -179,9 +181,9 @@ const ProductDetails = () => {
               <p className="text-gray-600 leading-relaxed mb-8 text-lg">{product.description}</p>
             </div>
             
-            {/* قسم أزرار التفاعل (بدون زر الواتساب) */}
+            {/* قسم أزرار التفاعل */}
             <div className="flex flex-col gap-3">
-              {/* زر الشراء المباشر إذا وُجد رابط متجر/عمولة */}
+              {/* زر الشراء المباشر */}
               {targetBuyUrl && (
                 <button 
                   onClick={() => window.open(targetBuyUrl, '_blank')} 
