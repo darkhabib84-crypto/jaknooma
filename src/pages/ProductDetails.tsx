@@ -4,8 +4,16 @@ import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/
 import { db } from '../lib/firebase';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
-// تم إضافة أيقونات إضافية لتنسيق اسم البائع، الموقع، والوقت
-import { Share2, ShoppingCart, ExternalLink, ArrowLeft, User, MapPin, Calendar } from 'lucide-react';
+import { 
+  Share2, 
+  ExternalLink, 
+  ArrowLeft, 
+  User, 
+  MapPin, 
+  Calendar, 
+  MessageCircle, 
+  ShoppingCart 
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar'; 
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -51,11 +59,9 @@ const ProductDetails = () => {
     }
   };
 
-  // دالة لتنسيق وعرض تاريخ الإعلان بشكل جميل بالعربية
   const formatDate = (dateInput: any) => {
     if (!dateInput) return 'غير متوفر';
     try {
-      // التحقق مما إذا كان التاريخ مرسلاً كـ Firebase Timestamp
       const date = dateInput.toDate ? dateInput.toDate() : new Date(dateInput);
       return date.toLocaleDateString('ar-AE', {
         year: 'numeric',
@@ -67,14 +73,23 @@ const ProductDetails = () => {
     }
   };
 
-  if (loading) return <div className="flex justify-center p-20">جاري التحميل...</div>;
-  if (!product) return <div className="text-center p-20">المنتج غير موجود</div>;
+  if (loading) return <div className="flex justify-center p-20 font-bold">جاري التحميل...</div>;
+  if (!product) return <div className="text-center p-20 font-bold">المنتج غير موجود</div>;
 
   const images = Array.isArray(product.images) ? product.images : (product.images ? [product.images] : []);
+  
+  // تحديد رابط الشراء الخارجي أو رابط العمولة
+  const targetBuyUrl = product.affiliateLink || product.externalStoreLink || product.externalUrl;
+  
+  // تحديد رقم الهاتف
+  const sellerPhone = product.phone || product.sellerPhone;
+
+  // تحديد العملة
+  const currencySymbol = product.currency || 'AED';
 
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white">
-      {/* السايدبار ثابت */}
+      {/* السايدبار الثابت */}
       <div className="hidden md:block w-64 border-r border-gray-200 h-full overflow-y-auto">
         <Sidebar />
       </div>
@@ -86,6 +101,7 @@ const ProductDetails = () => {
         </button>
 
         <div className="grid lg:grid-cols-2 gap-12 max-w-6xl">
+          {/* معرض الصور */}
           <Swiper navigation={true} modules={[Navigation]} className="h-[400px] w-full rounded-3xl bg-gray-50 shadow-inner">
             {images.map((img: string, i: number) => (
               <SwiperSlide key={i}>
@@ -94,12 +110,15 @@ const ProductDetails = () => {
             ))}
           </Swiper>
 
+          {/* تفاصيل المنتج والمعلومات */}
           <div className="flex flex-col justify-between">
             <div>
               <h1 className="text-4xl font-extrabold text-gray-900 mb-2">{product.name}</h1>
-              <p className="text-3xl text-green-600 font-bold mb-4">{product.price} درهم</p>
+              <p className="text-3xl text-green-600 font-bold mb-4">
+                {product.price} {currencySymbol}
+              </p>
 
-              {/* قسم بيانات البائع، الموقع، وتاريخ الإعلان المضاف حديثاً */}
+              {/* قسم بيانات البائع، الموقع، وتاريخ الإعلان */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
                 {/* اسم البائع */}
                 <div className="flex items-center gap-2.5">
@@ -141,29 +160,51 @@ const ProductDetails = () => {
                 </div>
               </div>
 
+              {/* وصف المنتج */}
               <p className="text-gray-600 leading-relaxed mb-8 text-lg">{product.description}</p>
             </div>
             
-            <div className="flex flex-col gap-4">
-              {product.externalUrl && (
-                <button onClick={() => window.open(product.externalUrl, '_blank')} className="flex items-center justify-center gap-3 w-full py-4 bg-black text-white rounded-2xl font-bold text-lg hover:bg-gray-800 transition-all shadow-lg">
-                  <ExternalLink size={20} /> شراء من المتجر
+            {/* قسم أزرار التفاعل والإجراءات */}
+            <div className="flex flex-col gap-3">
+              {/* زر الشراء المباشر أو التراسل */}
+              {targetBuyUrl ? (
+                <button 
+                  onClick={() => window.open(targetBuyUrl, '_blank')} 
+                  className="flex items-center justify-center gap-3 w-full py-4 bg-black text-white rounded-2xl font-bold text-lg hover:bg-gray-800 transition-all shadow-lg active:scale-95"
+                >
+                  <ExternalLink size={20} /> شراء الآن من المتجر
                 </button>
-              )} 
+              ) : sellerPhone ? (
+                <a 
+                  href={`https://wa.me/${sellerPhone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-3 w-full py-4 bg-[#25D366] text-white rounded-2xl font-bold text-lg hover:bg-[#1da851] transition-all shadow-lg active:scale-95"
+                >
+                  <MessageCircle size={22} /> تواصل عبر واتساب
+                </a>
+              ) : null}
+
+              {/* زر إضافة للسلة */}
               <button 
                 onClick={() => addToCart(product)}
-                className="flex items-center justify-center gap-3 w-full py-4 border-2 border-gray-200 rounded-2xl font-bold text-lg hover:bg-gray-50 transition-all"
+                className="flex items-center justify-center gap-3 w-full py-4 border-2 border-gray-200 rounded-2xl font-bold text-lg hover:bg-gray-50 transition-all active:scale-95"
               >
                 <ShoppingCart size={20} /> إضافة للسلة
               </button>
 
-              <button onClick={handleShare} className="flex items-center justify-center gap-3 w-full py-4 text-gray-500 font-semibold hover:text-black transition-all">
-                <Share2 size={20} /> مشاركة المنتج
+              {/* زر مشاركة المنتج */}
+              <button 
+                onClick={handleShare} 
+                className="flex items-center justify-center gap-2 w-full py-3 text-gray-500 font-semibold hover:text-black transition-all"
+              >
+                <Share2 size={18} /> مشاركة المنتج
               </button>
             </div>
           </div>
         </div>
 
+        {/* آراء العملاء */}
         <div className="mt-20 max-w-6xl border-t pt-10">
           <h2 className="text-2xl font-bold mb-6">آراء العملاء</h2>
           <div className="p-8 bg-gray-50 rounded-3xl text-center border border-gray-100">
