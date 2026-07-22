@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, User, Calendar, Phone } from 'lucide-react';
+import { MapPin, User, Calendar } from 'lucide-react';
 
 export interface Product {
   id: string;
@@ -32,7 +32,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : originalPrice;
   
   const currencySymbol = product.currency || 'AED';
-  const phoneNumber = product.sellerPhone || product.phone;
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Just now';
@@ -118,7 +117,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Details Section */}
+          {/* Details Section (بدون رقم الهاتف) */}
           <div className="mt-3 pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-[11px] text-gray-500">
             {/* Seller */}
             <div className="flex items-center gap-1.5">
@@ -135,16 +134,6 @@ export default function ProductCard({ product }: ProductCardProps) {
                 Location: <strong className="text-gray-700 font-medium">{product.location || 'Not specified'}</strong>
               </span>
             </div>
-
-            {/* Phone Number Displayed as Plain Text */}
-            {phoneNumber && (
-              <div className="flex items-center gap-1.5">
-                <Phone size={12} className="text-gray-400 shrink-0" />
-                <span className="truncate">
-                  Phone: <strong className="text-gray-700 font-medium">{phoneNumber}</strong>
-                </span>
-              </div>
-            )}
 
             {/* Date */}
             <div className="flex items-center gap-1.5">
