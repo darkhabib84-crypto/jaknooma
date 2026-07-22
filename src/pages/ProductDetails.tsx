@@ -88,16 +88,15 @@ const ProductDetails = () => {
   const currencySymbol = product.currency || 'AED';
 
   return (
-    // التعديل هنا: استخدام min-h-screen بدلاً من h-screen وإلغاء overflow-hidden
-    <div className="flex w-full min-h-screen bg-white">
+    <div className="flex w-full min-h-screen bg-white outline-none">
       
-      {/* السايدبار الثابت أثناء السكرول */}
-      <div className="hidden md:block w-64 border-r border-gray-200 h-screen sticky top-0 shrink-0">
+      {/* السايدبار الثابت (تم توحيد حدود الفصل لتكون رمادية خفيفة جداً بدون خطوط داكنة) */}
+      <div className="hidden md:block w-64 border-l border-gray-100 h-screen sticky top-0 shrink-0 overflow-hidden">
         <Sidebar />
       </div>
 
-      {/* المحتوى الرئيسي الموحد مع سكرول الصفحة */}
-      <main className="flex-1 p-6 md:p-10" dir="rtl">
+      {/* المحتوى الرئيسي (تم تطبيق outline-none لمنع الخط الأسود عند التركيز) */}
+      <main className="flex-1 p-6 md:p-10 outline-none border-none" dir="rtl">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium">
           <ArrowLeft size={18} className="rotate-180" /> العودة للتسوق
         </button>
@@ -213,7 +212,7 @@ const ProductDetails = () => {
         </div>
 
         {/* آراء العملاء */}
-        <div className="mt-20 max-w-6xl border-t pt-10">
+        <div className="mt-20 max-w-6xl border-t border-gray-100 pt-10">
           <h2 className="text-2xl font-bold mb-6">آراء العملاء</h2>
           <div className="p-8 bg-gray-50 rounded-3xl text-center border border-gray-100">
             <p className="text-gray-500">لا توجد تقييمات لهذا المنتج حالياً.</p>
