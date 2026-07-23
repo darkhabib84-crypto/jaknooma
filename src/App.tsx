@@ -83,7 +83,6 @@ function AppContent() {
         {/* المسارات الرئيسية مع الـ Layout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={
-            /* تم التعديل هنا: إزالة overflow-hidden و overflow-y-auto لجعل السكرول بار موحداً للصفحة بالكامل */
             <div className="flex flex-1 min-h-screen relative">
               <Sidebar />
               <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
@@ -95,6 +94,29 @@ function AppContent() {
           } />
           
           <Route path="/product/:id" element={<ProductDetails />} />
+          
+          {/* مسارات صفحة البائع والمتجر */}
+          <Route path="/store/:storeId" element={
+            <div className="flex flex-1 min-h-screen relative">
+              <Sidebar />
+              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
+                <Breadcrumbs />
+                <ProductGrid />
+                <Footer />
+              </main>
+            </div>
+          } />
+          <Route path="/seller/:sellerId" element={
+            <div className="flex flex-1 min-h-screen relative">
+              <Sidebar />
+              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
+                <Breadcrumbs />
+                <ProductGrid />
+                <Footer />
+              </main>
+            </div>
+          } />
+
           <Route path="/terms" element={<Terms />} />
           <Route path="/add-product" element={<AddProductForm />} />
           <Route path="/profile" element={<UserProfile />} />
