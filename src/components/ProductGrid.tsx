@@ -22,7 +22,9 @@ export default function ProductGrid() {
   const { t } = useTranslation();
   const { stores } = useStores();
 
+  // جلب الفلاتر من الـ URL (بما فيها القسم الفرعي sub)
   const categoryFilter = searchParams.get('category');
+  const subCategoryFilter = searchParams.get('sub'); // 👈 تم إضافة استخراج القسم الفرعي هنا
   const minPriceFilter = searchParams.get('minPrice');
   const maxPriceFilter = searchParams.get('maxPrice');
   const storeFilters = searchParams.getAll('store');
@@ -79,10 +81,35 @@ export default function ProductGrid() {
 
   const filteredProducts = useMemo(() => {
     const filtered = displayProducts.filter((product: any) => {
-      if (categoryFilter && product.category !== categoryFilter) return false;
+      // 1. التصفية حسب القسم الرئيسي (مثلاً Cars & Automotive Brands)
+      if (categoryFilter) {
+        const prodCat = (product.category || '').toLowerCase().trim();
+        const targetCat = categoryFilter.toLowerCase().trim();
+
+        // مطابقة مرنة للقسم الرئيسي لتجنب الاختلاف بين "cars" و "Cars & Automotive Brands"
+        const isCategoryMatch =
+          prodCat === targetCat ||
+          prodCat.includes(targetCat) ||
+          targetCat.includes(prodCat);
+
+        if (!isCategoryMatch) return false;
+      }
+
+      // 2. التصفية حسب القسم الفرعي (حقل subcategory في الفايرستور)
+      if (subCategoryFilter) {
+        // فحص حقول الأقسام الفرعية المحتملة في الفايرستور (subcategory أو sub)
+        const productSub = product.subcategory || product.sub || product.subCategory;
+        if (!productSub) return false;
+
+        const isSubMatch = productSub.toString().trim().toLowerCase() === subCategoryFilter.trim().toLowerCase();
+        if (!isSubMatch) return false;
+      }
+
+      // 3. باقي السعر والمتاجر
       if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
       if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
       if (storeFilters.length > 0 && !storeFilters.includes(product.storeId) && !storeFilters.includes(product.storeName)) return false;
+
       return true;
     });
 
@@ -102,7 +129,7 @@ export default function ProductGrid() {
 
       return getScore(b) - getScore(a);
     });
-  }, [displayProducts, categoryFilter, minPriceFilter, maxPriceFilter, storeFilters]);
+  }, [displayProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters]);
 
   return (
     <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
@@ -136,4 +163,3 @@ export default function ProductGrid() {
     </div>
   );
 }
-
