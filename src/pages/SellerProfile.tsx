@@ -1,31 +1,29 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react'
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import ProductCard, { Product } from '../components/ProductCard';
 import { 
   User, 
+  Phone, 
+  MapPin, 
   Calendar, 
   Star, 
-  Flag, 
-  Phone, 
-  ShoppingBag, 
-  CheckCircle2, 
-  ArrowLeft,
-  AlertCircle
+  ArrowLeft, 
+  Store, 
+  Package,
+  ShoppingCart
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import Sidebar from '../components/Sidebar';
+import { useCart } from '../contexts/CartContext';
 
 export default function SellerProfile() {
-  const { sellerId } = useParams();
+  const { sellerId } = useParams<{ sellerId: string }>(); // 👈 التقط Parameter التاجر
   const navigate = useNavigate();
+  const { addToCart } = useCart();
 
-  const [sellerInfo, setSellerInfo] = useState<any>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [seller, setSeller] = useState<any>(null);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'products' | 'reviews'>('products');
-  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     const fetchSellerData = async () => {
@@ -33,50 +31,30 @@ export default function SellerProfile() {
       setLoading(true);
 
       try {
-        // 1. جلب بيانات البائع (من مجموعة users أو stores)
-        let sellerData: any = null;
-        const userDoc = await getDoc(doc(db, 'users', sellerId));
-        
-        if (userDoc.exists()) {
-          sellerData = userDoc.data();
-        } else {
-          // تجربة البحث في مجموعة المحلات
-          const storeDoc = await getDoc(doc(db, 'stores', sellerId));
-          if (storeDoc.exists()) sellerData = storeDoc.data();
+        // 1. جلب بيانات التاجر من Firebase
+        let userSnap = await getDoc(doc(db, 'users', sellerId));
+        if (!userSnap.exists()) {
+          userSnap = await getDoc(doc(db, 'stores', sellerId));
         }
 
-        // 2. جلب منتجات البائع
-        const qProducts = query(
+        if (userSnap.exists()) {
+          setSeller({ id: userSnap.id, ...userSnap.data() });
+        }
+
+        // 2. جلب كافة منتجات التاجر
+        const q = query(
           collection(db, 'products'),
           where('sellerId', '==', sellerId)
         );
-        const querySnapshot = await getDocs(qProducts);
-        const sellerProducts = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-
-        // إذا لم تجد بيانات البائع في المجموعات، نأخذها من المجموع الكلي أو المنتج الأخير
-        if (!sellerData && sellerProducts.length > 0) {
-          const firstProduct: any = sellerProducts[0];
-          sellerData = {
-            displayName: firstProduct.storeName || firstProduct.sellerName || 'بائع معتمد',
-            email: firstProduct.sellerEmail || '',
-            createdAt: firstProduct.createdAt || new Date(),
-            phone: firstProduct.phone || firstProduct.sellerPhone,
-          };
-        }
-
-        setSellerInfo(sellerData);
-        setProducts(sellerProducts);
-
-        // 3. جلب تقييمات البائع
-        const qReviews = query(
-          collection(db, 'reviews'),
-          where('sellerId', '==', sellerId)
-        );
-        const reviewsSnapshot = await getDocs(qReviews);
-        setReviews(reviewsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        const querySnapshot = await getDocs(q);
+        const fetchedProducts = querySnapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+        setProducts(fetchedProducts);
 
       } catch (error) {
-        console.error("خطأ في جلب بيانات البائع:", error);
+        console.error("Error fetching seller profile:", error);
       } finally {
         setLoading(false);
       }
@@ -85,216 +63,123 @@ export default function SellerProfile() {
     fetchSellerData();
   }, [sellerId]);
 
-  const formatDate = (dateInput: any) => {
-    if (!dateInput) return 'عضو منذ فترة';
-    try {
-      const date = dateInput.toDate ? dateInput.toDate() : new Date(dateInput);
-      return date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'long' });
-    } catch {
-      return 'عضو جديد';
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent"></div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
+        <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="font-bold text-gray-600">جاري تحميل صفحة البائع...</p>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50/50 py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-8">
+  const sellerName = seller?.displayName || seller?.storeName || seller?.name || 'متجر غير معنون';
+  const sellerAvatar = seller?.photoURL || seller?.avatar || null;
 
-        {/* زر العودة */}
+  return (
+    <div className="flex w-full min-h-screen bg-[#FAFAFA]">
+      <div className="hidden md:block w-64 border-l border-gray-100 h-screen sticky top-0 shrink-0 overflow-hidden bg-white">
+        <Sidebar />
+      </div>
+
+      <main className="flex-1 p-6 md:p-10" dir="rtl">
         <button 
           onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 text-gray-500 hover:text-black font-medium transition-colors"
+          className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium"
         >
-          <ArrowLeft size={18} className="rotate-180" /> العودة للكتالوج
+          <ArrowLeft size={18} className="rotate-180" /> العودة
         </button>
 
-        {/* 💳 بطاقة البائع الرئيسية (Header Profile) */}
-        <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-tr from-gray-900 to-gray-700 text-white flex items-center justify-center text-3xl font-black shadow-lg shrink-0">
-              {sellerInfo?.photoURL ? (
-                <img src={sellerInfo.photoURL} alt="Avatar" className="w-full h-full object-cover rounded-2xl" />
-              ) : (
-                sellerInfo?.displayName?.charAt(0) || <User size={36} />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">
-                  {sellerInfo?.displayName || sellerInfo?.storeName || 'متجر غير مسمى'}
-                </h1>
-                <CheckCircle2 size={20} className="text-blue-500 fill-blue-50 transition-transform hover:scale-110" />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 font-medium">
-                <span className="flex items-center gap-1">
-                  <Calendar size={15} className="text-gray-400" />
-                  انضم في {formatDate(sellerInfo?.createdAt)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <ShoppingBag size={15} className="text-gray-400" />
-                  {products.length} منتج معروض
-                </span>
-              </div>
-
-              {/* التقييم العام */}
-              <div className="flex items-center gap-2 pt-1">
-                <div className="flex items-center text-amber-400">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={16} fill={i < (sellerInfo?.rating || 5) ? "currentColor" : "none"} className={i < (sellerInfo?.rating || 5) ? "" : "text-gray-300"} />
-                  ))}
-                </div>
-                <span className="text-sm font-bold text-gray-800">
-                  {sellerInfo?.rating || '5.0'} ({reviews.length} تقييم)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* أزرار الإجراءات للعميل */}
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {sellerInfo?.phone && (
-              <a 
-                href={`tel:${sellerInfo.phone}`}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-black text-white rounded-xl font-bold text-sm hover:bg-gray-800 transition-all shadow-md active:scale-95"
-              >
-                <Phone size={16} /> تواصل مع البائع
-              </a>
-            )}
-
-            <button 
-              onClick={() => setShowReportModal(true)}
-              className="flex items-center justify-center gap-2 px-4 py-3 border border-red-200 text-red-600 rounded-xl font-bold text-sm hover:bg-red-50 transition-colors"
-            >
-              <Flag size={16} /> إبلاغ عن البائع / منتج
-            </button>
-          </div>
-        </div>
-
-        {/* 🗂️ التبويبات (المنتجات / التقييمات) */}
-        <div className="border-b border-gray-200 flex gap-8">
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`pb-4 text-base font-bold transition-all relative ${
-              activeTab === 'products' ? 'text-black border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            منتجات البائع ({products.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('reviews')}
-            className={`pb-4 text-base font-bold transition-all relative ${
-              activeTab === 'reviews' ? 'text-black border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            تقييمات العملاء ({reviews.length})
-          </button>
-        </div>
-
-        {/* 📦 عرض المنتجات */}
-        {activeTab === 'products' && (
-          <div>
-            {products.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {products.map((product) => (
-                  <motion.div key={product.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <ProductCard product={product} />
-                  </motion.div>
-                ))}
-              </div>
+        {/* كارت معلومات البائع الهيدر */}
+        <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm mb-10">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-right">
+            {sellerAvatar ? (
+              <img src={sellerAvatar} className="w-24 h-24 rounded-2xl object-cover border border-gray-100 shadow-sm" alt={sellerName} />
             ) : (
-              <div className="text-center py-16 bg-white rounded-3xl border border-gray-100">
-                <ShoppingBag size={48} className="mx-auto text-gray-300 mb-3" />
-                <p className="text-gray-500 font-bold">لا توجد منتجات معروضة حالياً لهذا البائع.</p>
+              <div className="w-24 h-24 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Store size={40} />
               </div>
             )}
-          </div>
-        )}
 
-        {/* ⭐ عرض التقييمات */}
-        {activeTab === 'reviews' && (
-          <div>
-            {reviews.length > 0 ? (
-              <div className="space-y-4 max-w-3xl">
-                {reviews.map((rev) => (
-                  <div key={rev.id} className="p-5 bg-white rounded-2xl border border-gray-100 shadow-sm space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-900">{rev.userName || 'عميل'}</span>
-                      <div className="flex text-amber-400">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={14} fill={i < rev.rating ? "currentColor" : "none"} className={i < rev.rating ? "" : "text-gray-300"} />
-                        ))}
+            <div className="flex-1">
+              <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2">{sellerName}</h1>
+              
+              <div className="flex flex-wrap justify-center sm:justify-start items-center gap-4 text-sm text-gray-500 mb-4">
+                <div className="flex items-center gap-1 text-amber-400">
+                  <Star size={16} fill="currentColor" />
+                  <span className="font-bold text-gray-800">5.0</span>
+                  <span className="text-gray-400">(تقييمات المتجر)</span>
+                </div>
+
+                {seller?.phone && (
+                  <div className="flex items-center gap-1">
+                    <Phone size={15} className="text-emerald-600" />
+                    <a href={`tel:${seller.phone}`} className="dir-ltr hover:underline font-semibold text-gray-700">{seller.phone}</a>
+                  </div>
+                )}
+
+                {seller?.location && (
+                  <div className="flex items-center gap-1">
+                    <MapPin size={15} className="text-red-500" />
+                    <span>{seller.location}</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-gray-600 text-sm max-w-2xl">{seller?.bio || 'أهلاً بكم في متجري المخصص، يمكنك استعراض كافة المنتجات والتواصل المباشر لشراء الإعلانات.'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* شبكة جميع منتجات التاجر */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Package size={24} /> جميع إعلانات البائع ({products.length})
+          </h2>
+
+          {products.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+              <Package size={48} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 font-bold">لا توجد منتجات مضافة لهذا البائع حالياً.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.map((prod) => {
+                const img = Array.isArray(prod.images) ? prod.images[0] : (prod.imageUrl || prod.images || '/placeholder.png');
+                return (
+                  <div 
+                    key={prod.id} 
+                    className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between cursor-pointer"
+                    onClick={() => navigate(`/product/${prod.id}`)}
+                  >
+                    <div>
+                      <div className="w-full h-48 bg-gray-50 overflow-hidden">
+                        <img src={img} alt={prod.name} className="w-full h-full object-contain p-3 hover:scale-105 transition-transform" />
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-bold text-gray-900 line-clamp-1 mb-1">{prod.name}</h3>
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-3">{prod.description}</p>
                       </div>
                     </div>
-                    <p className="text-gray-600 text-sm">{rev.comment}</p>
+
+                    <div className="p-4 pt-0 flex items-center justify-between border-t border-gray-50 mt-auto">
+                      <span className="font-extrabold text-green-600">{prod.price} {prod.currency || 'AED'}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(prod);
+                        }}
+                        className="p-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors"
+                      >
+                        <ShoppingCart size={16} />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              /* حالة عدم وجود تقييمات */
-              <div className="text-center py-16 bg-white rounded-3xl border border-gray-100 p-8 space-y-4">
-                <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
-                  <AlertCircle size={32} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">لا توجد تقييمات حالية</h3>
-                  <p className="text-gray-500 text-sm max-w-sm mx-auto mt-1">
-                    لم يقم أي عميل بكتابة تقييم لهذا البائع بعد. كن أول من يتعامل معه ويشارك تجربته!
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 🚨 النافذة المنبثقة للإبلاغ (Report Modal) */}
-        {showReportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 border border-gray-100 shadow-2xl animate-in fade-in zoom-in-95">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
-                  <Flag size={20} /> إبلاغ عن مخالفة
-                </h3>
-                <button onClick={() => setShowReportModal(false)} className="text-gray-400 hover:text-black font-bold">✕</button>
-              </div>
-              <p className="text-sm text-gray-600">
-                يرجى توضيح سبب الإبلاغ عن هذا البائع أو منتجاته ليتم مراجعتها من قبل الإدارة:
-              </p>
-              <textarea 
-                rows={4} 
-                placeholder="اكتب تفاصيل البلاغ هنا..." 
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-black outline-none text-sm"
-              />
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => {
-                    alert("تم إرسال بلاغك بنجاح للإدارة وسنتم مراجعته كأولوية.");
-                    setShowReportModal(false);
-                  }}
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-colors"
-                >
-                  إرسال البلاغ
-                </button>
-                <button 
-                  onClick={() => setShowReportModal(false)}
-                  className="px-5 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-200 transition-colors"
-                >
-                  إلغاء
-                </button>
-              </div>
+                );
+              })}
             </div>
-          </div>
-        )}
-
-      </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
