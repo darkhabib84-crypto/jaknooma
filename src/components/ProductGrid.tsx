@@ -24,7 +24,7 @@ export default function ProductGrid() {
 
   // جلب الفلاتر من الـ URL (بما فيها القسم الفرعي sub)
   const categoryFilter = searchParams.get('category');
-  const subCategoryFilter = searchParams.get('sub'); // 👈 تم إضافة استخراج القسم الفرعي هنا
+  const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
   const maxPriceFilter = searchParams.get('maxPrice');
   const storeFilters = searchParams.getAll('store');
@@ -45,11 +45,26 @@ export default function ProductGrid() {
         const fetchedProducts = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
           let dynamicRank = data.rank || 0;
-          if (data.isVIP && data.vipExpiry) {
-            const expiryDate = data.vipExpiry.toDate ? data.vipExpiry.toDate() : new Date(data.vipExpiry);
-            if (expiryDate > now) dynamicRank = 1000;
+
+          // دعم كل من isVIP و isVip بغض النظر عن حالة الأحرف
+          const isVipStatus = Boolean(data.isVIP || data.isVip);
+
+          if (isVipStatus) {
+            if (data.vipExpiry) {
+              const expiryDate = data.vipExpiry.toDate ? data.vipExpiry.toDate() : new Date(data.vipExpiry);
+              if (expiryDate > now) dynamicRank = 1000;
+            } else {
+              // في حال تم تفعيل الـ VIP بدون تحديد تاريخ انتهاء
+              dynamicRank = 1000;
+            }
           }
-          return { id: doc.id, ...data, rank: dynamicRank } as Product;
+
+          return { 
+            id: doc.id, 
+            ...data, 
+            isVIP: isVipStatus, // توحيد الحقل في الكائن الداخلي
+            rank: dynamicRank 
+          } as Product;
         });
 
         fetchedProducts.sort((a: any, b: any) => b.rank - a.rank);
@@ -81,12 +96,11 @@ export default function ProductGrid() {
 
   const filteredProducts = useMemo(() => {
     const filtered = displayProducts.filter((product: any) => {
-      // 1. التصفية حسب القسم الرئيسي (مثلاً Cars & Automotive Brands)
+      // 1. التصفية حسب القسم الرئيسي (مثل Cars & Automotive Brands)
       if (categoryFilter) {
         const prodCat = (product.category || '').toLowerCase().trim();
         const targetCat = categoryFilter.toLowerCase().trim();
 
-        // مطابقة مرنة للقسم الرئيسي لتجنب الاختلاف بين "cars" و "Cars & Automotive Brands"
         const isCategoryMatch =
           prodCat === targetCat ||
           prodCat.includes(targetCat) ||
@@ -95,17 +109,16 @@ export default function ProductGrid() {
         if (!isCategoryMatch) return false;
       }
 
-      // 2. التصفية حسب القسم الفرعي (حقل subcategory في الفايرستور)
+      // 2. التصفية حسب القسم الفرعي (حقل subCategory أو subcategory أو sub في الفايرستور)
       if (subCategoryFilter) {
-        // فحص حقول الأقسام الفرعية المحتملة في الفايرستور (subcategory أو sub)
-        const productSub = product.subcategory || product.sub || product.subCategory;
+        const productSub = product.subCategory || product.subcategory || product.sub;
         if (!productSub) return false;
 
         const isSubMatch = productSub.toString().trim().toLowerCase() === subCategoryFilter.trim().toLowerCase();
         if (!isSubMatch) return false;
       }
 
-      // 3. باقي السعر والمتاجر
+      // 3. التصفية حسب السعر والمتاجر
       if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
       if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
       if (storeFilters.length > 0 && !storeFilters.includes(product.storeId) && !storeFilters.includes(product.storeName)) return false;
@@ -113,15 +126,16 @@ export default function ProductGrid() {
       return true;
     });
 
-    // الترتيب: VIP يظهر دائماً في الأعلى أولاً، ثم الترتيب حسب النوع
+    // الترتيب: إعلانات الـ VIP تظهر دائماً في الأعلى أولاً
     return filtered.sort((a: any, b: any) => {
-      // 1. منطق الـ VIP: (تأكد دائماً أن الـ VIP يظهر في الأعلى أولاً)
-      if (a.isVIP && !b.isVIP) return -1;
-      if (!a.isVIP && b.isVIP) return 1;
+      const aIsVip = Boolean(a.isVIP || a.isVip || a.rank >= 1000);
+      const bIsVip = Boolean(b.isVIP || b.isVip || b.rank >= 1000);
 
-      // 2. إذا كان كلاهما VIP أو كلاهما عادي، نرتب حسب الخصومات أو الترتيب الافتراضي
+      if (aIsVip && !bIsVip) return -1;
+      if (!aIsVip && bIsVip) return 1;
+
       const getScore = (p: any) => {
-        let score = 0;
+        let score = p.rank || 0;
         if (p.discountType === 'gold') score += 500;
         if (p.discountType === 'silver') score += 250;
         return score;
