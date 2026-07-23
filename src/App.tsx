@@ -4,7 +4,6 @@
  */
 
 import { useEffect } from 'react';
-// تمت إزالة BrowserRouter من الاستيراد لأنه أصبح الآن في main.tsx
 import { Routes, Route, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import './lib/i18n';
 import Header from './components/Header';
@@ -21,7 +20,7 @@ import AdminAnalytics from './components/admin/AdminAnalytics';
 import AdminSearch from './components/admin/AdminSearch';
 import AdminSettings from './components/admin/AdminSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { UIProvider, useUI } from './contexts/UIContext';
+import { UIProvider } from './contexts/UIContext';
 import AuthModal from './components/AuthModal';
 import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { auth } from './lib/firebase';
@@ -37,7 +36,6 @@ import Checkout from './pages/Checkout';
 
 // استيراد الـ Hook المخصص لتتبع زوار موقعك "Jaknooma"
 import { usePageTracking } from './hooks/usePageTracking';
-
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -59,11 +57,9 @@ function MainLayout() {
 }
 
 function AppContent() {
-  // الآن سيعمل هذا الهوك بأمان تام لأن التطبيق بالكامل مغلف بـ BrowserRouter في ملف main.tsx
   usePageTracking();
 
   useEffect(() => {
-    // منطق تسجيل الدخول بالرابط (تم تركه كما هو)
     if (isSignInWithEmailLink(auth, window.location.href)) {
       let email = window.localStorage.getItem('emailForSignIn');
       if (!email) {
@@ -81,15 +77,16 @@ function AppContent() {
   }, []);
 
   return (
-    <> {/* تم استبدال BrowserRouter بـ React Fragment لأن التغليف أصبح في ملف main.tsx */}
+    <>
       <ScrollToTop />
       <Routes>
         {/* المسارات الرئيسية مع الـ Layout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={
-            <div className="flex flex-1 overflow-hidden relative">
+            /* تم التعديل هنا: إزالة overflow-hidden و overflow-y-auto لجعل السكرول بار موحداً للصفحة بالكامل */
+            <div className="flex flex-1 min-h-screen relative">
               <Sidebar />
-              <main className="flex-1 flex flex-col overflow-y-auto w-full relative z-0">
+              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
                 <Breadcrumbs />
                 <ProductGrid />
                 <Footer />
@@ -97,9 +94,7 @@ function AppContent() {
             </div>
           } />
           
-          {/* هنا وضعنا صفحة تفاصيل المنتج لتظهر داخل الـ MainLayout */}
           <Route path="/product/:id" element={<ProductDetails />} />
-          
           <Route path="/terms" element={<Terms />} />
           <Route path="/add-product" element={<AddProductForm />} />
           <Route path="/profile" element={<UserProfile />} />
@@ -129,7 +124,6 @@ function AppContent() {
     </>
   );
 }
-
 
 function AuthRedirect({ mode }: { mode: 'login' | 'signup' | 'email-link' | 'phone' }) {
   const { openAuthModal } = useAuth();
