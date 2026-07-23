@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
@@ -28,11 +28,10 @@ const ProductDetails = () => {
   const navigate = useNavigate();
   const [product, setProduct] = useState<any>(null);
   const [sellerData, setSellerData] = useState<any>(null);
-  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
 
-  // جلب تفاصيل المنتج
+  // 1. جلب تفاصيل المنتج
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
@@ -50,46 +49,27 @@ const ProductDetails = () => {
     fetchProduct();
   }, [id]);
 
-  // جلب بيانات البائع والمنتجات ذات الصلة
+  // 2. جلب بيانات البائع فقط لزر التوجيه
   useEffect(() => {
     if (!product) return;
-
     const sellerIdentifier = product.storeId || product.sellerId;
 
-    const fetchSellerAndRelated = async () => {
-      // 1. جلب بيانات البائع إن وجدت
-      if (sellerIdentifier) {
-        try {
-          const userSnap = await getDoc(doc(db, 'users', sellerIdentifier));
-          if (userSnap.exists()) {
-            setSellerData(userSnap.data());
-          } else {
-            const storeSnap = await getDoc(doc(db, 'stores', sellerIdentifier));
-            if (storeSnap.exists()) setSellerData(storeSnap.data());
-          }
-        } catch (e) {
-          console.error("Error fetching seller details:", e);
+    const fetchSellerData = async () => {
+      if (!sellerIdentifier) return;
+      try {
+        const userSnap = await getDoc(doc(db, 'users', sellerIdentifier));
+        if (userSnap.exists()) {
+          setSellerData(userSnap.data());
+        } else {
+          const storeSnap = await getDoc(doc(db, 'stores', sellerIdentifier));
+          if (storeSnap.exists()) setSellerData(storeSnap.data());
         }
-
-        // 2. جلب المنتجات الأخرى لنفس البائع
-        try {
-          const q = query(
-            collection(db, 'products'), 
-            where('sellerId', '==', sellerIdentifier), 
-            limit(5)
-          );
-          const snapshot = await getDocs(q);
-          const fetchedRelated = snapshot.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .filter(p => p.id !== product.id);
-          setRelatedProducts(fetchedRelated);
-        } catch (e) {
-          console.error("Error fetching related products:", e);
-        }
+      } catch (e) {
+        console.error("Error fetching seller details:", e);
       }
     };
 
-    fetchSellerAndRelated();
+    fetchSellerData();
   }, [product]);
 
   const handleShare = async () => {
@@ -151,7 +131,7 @@ const ProductDetails = () => {
   return (
     <div className="flex w-full min-h-screen bg-white outline-none">
       
-      {/* السايدبار الشاشات الكبيرة */}
+      {/* السايدبار الجانبي */}
       <div className="hidden md:block w-64 border-l border-gray-100 h-screen sticky top-0 shrink-0 overflow-hidden">
         <Sidebar />
       </div>
@@ -188,10 +168,10 @@ const ProductDetails = () => {
                 </span>
               </div>
 
-              {/* بطاقة معلومات البائع والموقع */}
+              {/* بطاقة معلومات سريعة عن البائع والموقع */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
                 
-                {/* البائع */}
+                {/* اسم البائع ورابط الانتقال لصفحته */}
                 <div className="flex items-center gap-3">
                   {sellerAvatar ? (
                     <img src={sellerAvatar} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-gray-200" alt={sellerName} />
@@ -265,7 +245,7 @@ const ProductDetails = () => {
               </div>
             </div>
             
-            {/* قسم الأزرار والإجراءات */}
+            {/* أزرار الشراء والتفاعل */}
             <div className="flex flex-col gap-3 pt-4 border-t border-gray-100">
               {targetBuyUrl && (
                 <button 
@@ -293,49 +273,12 @@ const ProductDetails = () => {
           </div>
         </div>
 
-        {/* منتجات أخرى من نفس البائع */}
-        {relatedProducts.length > 0 && (
-          <div className="mt-16 max-w-6xl border-t border-gray-100 pt-10">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">منتجات أخرى من {sellerName}</h2>
-              {targetSellerId && (
-                <Link
-                  to={`/store/${targetSellerId}`}
-                  className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1"
-                >
-                  عرض الكل <ChevronLeft size={16} />
-                </Link>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {relatedProducts.map((rel) => {
-                const relImg = Array.isArray(rel.images) ? rel.images[0] : (rel.imageUrl || rel.images || '/placeholder.png');
-                return (
-                  <Link
-                    key={rel.id}
-                    to={`/product/${rel.id}`}
-                    className="group border border-gray-100 rounded-2xl p-3 bg-white hover:shadow-md transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="w-full h-36 bg-gray-50 rounded-xl overflow-hidden mb-3">
-                        <img src={relImg} alt={rel.name} className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform" />
-                      </div>
-                      <h4 className="font-bold text-sm text-gray-800 line-clamp-1 mb-1">{rel.name}</h4>
-                    </div>
-                    <p className="font-extrabold text-green-600 text-sm mt-2">{rel.price} {currencySymbol}</p>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* كارت التوجيه متجر البائع والتقييمات */}
-        <div className="mt-12 max-w-6xl">
+        {/* كارت التوجيه الحصري لصفحة البائع الكاملة (المعلومات + المنتجات + التقييمات) */}
+        <div className="mt-16 max-w-6xl border-t border-gray-100 pt-10">
           <div className="p-8 bg-gray-50 rounded-3xl border border-gray-100 text-center flex flex-col items-center">
-            <Store size={36} className="text-gray-400 mb-3" />
+            <Store size={40} className="text-gray-400 mb-3" />
             <h3 className="text-xl font-bold text-gray-900 mb-1">متجر {sellerName}</h3>
+            
             <div className="flex justify-center items-center gap-1 text-amber-400 mb-3">
               <Star size={18} fill="currentColor" />
               <Star size={18} fill="currentColor" />
@@ -343,13 +286,18 @@ const ProductDetails = () => {
               <Star size={18} fill="currentColor" />
               <Star size={18} fill="currentColor" />
             </div>
-            <p className="text-gray-600 text-sm max-w-md mb-6">يمكنك الاستفسار والتواصل المباشر مع التاجر أو استعراض كامل متجره وتقييماته.</p>
+
+            <p className="text-gray-600 text-sm max-w-md mb-6">
+              للإطلاع على جميع منتجات التاجر الأخرى، التقييمات، ومعلومات التواصل كاملة، يمكنك زيارة بروفايل البائع المخصص.
+            </p>
+
             {targetSellerId && (
               <button
                 onClick={() => navigate(`/store/${targetSellerId}`)}
-                className="px-8 py-3 bg-black text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors shadow-md"
+                className="flex items-center gap-2 px-8 py-3 bg-black text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors shadow-md active:scale-95"
               >
-                زيارة صفحة البائع
+                الانتقال لصفحة البائع والتقييمات
+                <ChevronLeft size={16} />
               </button>
             )}
           </div>
