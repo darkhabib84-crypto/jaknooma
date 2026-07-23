@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -12,7 +12,9 @@ import {
   MapPin, 
   Calendar, 
   Phone,
-  ShoppingCart 
+  ShoppingCart,
+  ChevronLeft,
+  Star
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar'; 
 import 'swiper/css';
@@ -40,9 +42,14 @@ const ProductDetails = () => {
   }, [id]);
 
   useEffect(() => {
-    if (product?.storeId) {
+    if (product?.storeId || product?.sellerId) {
+      const sellerIdentifier = product.storeId || product.sellerId;
       const fetchRelated = async () => {
-        const q = query(collection(db, 'products'), where('storeId', '==', product.storeId), limit(4));
+        const q = query(
+          collection(db, 'products'), 
+          where('sellerId', '==', sellerIdentifier), 
+          limit(4)
+        );
         const snapshot = await getDocs(q);
         setRelatedProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.id !== product.id));
       };
@@ -87,15 +94,19 @@ const ProductDetails = () => {
   // تحديد العملة
   const currencySymbol = product.currency || 'AED';
 
+  // تحديد معرف البائع للانتقال لصفحته
+  const targetSellerId = product.sellerId || product.storeId;
+  const sellerName = product.storeName || product.sellerName || 'بائع غير معروف';
+
   return (
     <div className="flex w-full min-h-screen bg-white outline-none">
       
-      {/* السايدبار الثابت (تم توحيد حدود الفصل لتكون رمادية خفيفة جداً بدون خطوط داكنة) */}
+      {/* السايدبار الثابت */}
       <div className="hidden md:block w-64 border-l border-gray-100 h-screen sticky top-0 shrink-0 overflow-hidden">
         <Sidebar />
       </div>
 
-      {/* المحتوى الرئيسي (تم تطبيق outline-none لمنع الخط الأسود عند التركيز) */}
+      {/* المحتوى الرئيسي */}
       <main className="flex-1 p-6 md:p-10 outline-none border-none" dir="rtl">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium">
           <ArrowLeft size={18} className="rotate-180" /> العودة للتسوق
@@ -121,16 +132,25 @@ const ProductDetails = () => {
 
               {/* قسم بيانات البائع، الموقع، رقم الهاتف، وتاريخ الإعلان */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
-                {/* اسم البائع */}
+                
+                {/* اسم البائع وقابلية النقر للذهاب لصفحة البائع */}
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                     <User size={18} />
                   </div>
-                  <div>
+                  <div className="flex-1 overflow-hidden">
                     <span className="block text-[10px] text-gray-400 font-medium">البائع</span>
-                    <span className="text-sm font-bold text-gray-700">
-                      {product.storeName || product.sellerName || 'بائع غير معروف'}
-                    </span>
+                    {targetSellerId ? (
+                      <button
+                        onClick={() => navigate(`/store/${targetSellerId}`)}
+                        className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors group text-right w-full"
+                      >
+                        <span className="truncate">{sellerName}</span>
+                        <ChevronLeft size={14} className="text-gray-400 group-hover:text-blue-600 transition-transform group-hover:-translate-x-0.5 shrink-0" />
+                      </button>
+                    ) : (
+                      <span className="text-sm font-bold text-gray-700">{sellerName}</span>
+                    )}
                   </div>
                 </div>
 
@@ -211,11 +231,37 @@ const ProductDetails = () => {
           </div>
         </div>
 
-        {/* آراء العملاء */}
+        {/* تقييمات وآراء العملاء للتاجر */}
         <div className="mt-20 max-w-6xl border-t border-gray-100 pt-10">
-          <h2 className="text-2xl font-bold mb-6">آراء العملاء</h2>
-          <div className="p-8 bg-gray-50 rounded-3xl text-center border border-gray-100">
-            <p className="text-gray-500">لا توجد تقييمات لهذا المنتج حالياً.</p>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">تقييمات المتجر والتجارب</h2>
+            {targetSellerId && (
+              <button
+                onClick={() => navigate(`/store/${targetSellerId}`)}
+                className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1"
+              >
+                عرض كل بضائع وتقييمات {sellerName} <ChevronLeft size={16} />
+              </button>
+            )}
+          </div>
+
+          <div className="p-8 bg-gray-50 rounded-3xl border border-gray-100 text-center">
+            <div className="flex justify-center items-center gap-1 text-amber-400 mb-2">
+              <Star size={20} fill="currentColor" />
+              <Star size={20} fill="currentColor" />
+              <Star size={20} fill="currentColor" />
+              <Star size={20} fill="currentColor" />
+              <Star size={20} fill="currentColor" />
+            </div>
+            <p className="text-gray-700 font-semibold mb-3">يمكنك الاطلاع على كافة منتجات وتقييمات البائع عبر صفحته الشخصية.</p>
+            {targetSellerId && (
+              <button
+                onClick={() => navigate(`/store/${targetSellerId}`)}
+                className="px-6 py-2.5 bg-black text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors"
+              >
+                زيارة متجر البائع
+              </button>
+            )}
           </div>
         </div>
       </main>
