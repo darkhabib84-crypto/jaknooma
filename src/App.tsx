@@ -34,6 +34,9 @@ import ApiMonitoring from './components/admin/ApiMonitoring';
 import ProductDetails from './pages/ProductDetails';
 import Checkout from './pages/Checkout';
 
+// استيراد صفحة البائع المخصصة الجديدة
+import SellerProfile from './pages/SellerProfile';
+
 // استيراد الـ Hook المخصص لتتبع زوار موقعك "Jaknooma"
 import { usePageTracking } from './hooks/usePageTracking';
 
@@ -95,27 +98,9 @@ function AppContent() {
           
           <Route path="/product/:id" element={<ProductDetails />} />
           
-          {/* مسارات صفحة البائع والمتجر */}
-          <Route path="/store/:storeId" element={
-            <div className="flex flex-1 min-h-screen relative">
-              <Sidebar />
-              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
-                <Breadcrumbs />
-                <ProductGrid />
-                <Footer />
-              </main>
-            </div>
-          } />
-          <Route path="/seller/:sellerId" element={
-            <div className="flex flex-1 min-h-screen relative">
-              <Sidebar />
-              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
-                <Breadcrumbs />
-                <ProductGrid />
-                <Footer />
-              </main>
-            </div>
-          } />
+          {/* مسارات صفحة البائع والمتجر الجديدة */}
+          <Route path="/store/:sellerId" element={<SellerProfile />} />
+          <Route path="/seller/:sellerId" element={<SellerProfile />} />
 
           <Route path="/terms" element={<Terms />} />
           <Route path="/add-product" element={<AddProductForm />} />
