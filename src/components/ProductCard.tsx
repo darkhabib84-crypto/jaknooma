@@ -1,13 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, User, Calendar } from 'lucide-react';
+import { MapPin, User, Calendar, ExternalLink } from 'lucide-react';
 
 export interface Product {
   id: string;
-  name: string;
+  name?: string;
+  title?: string;
   price: number;
   currency?: string;
-  images: string[];
+  images?: string[];
+  image?: string;
   isVIP?: boolean;
   externalUrl?: string;
   affiliateLink?: string;
@@ -16,6 +18,8 @@ export interface Product {
   discountPercent?: number;
   location?: string;
   sellerName?: string;
+  storeName?: string;
+  isExternal?: boolean;
   createdAt?: {
     seconds: number;
     nanoseconds: number;
@@ -27,11 +31,63 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  // 1. التعامل مع البطاقات الخارجية (بطاقات المتاجر القانونية بروابط الأفلييت)
+  if (product.isExternal) {
+    const storeName = product.storeName || 'المتجر الخارجي';
+    const title = product.title || product.name || `عرض النتائج على ${storeName}`;
+    const logoUrl = product.image || (Array.isArray(product.images) ? product.images[0] : '');
+
+    return (
+      <a
+        href={product.externalUrl || '#'}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex flex-col justify-between items-center w-full bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-black transition-all text-center h-full min-h-[320px]"
+      >
+        <div className="w-full flex-1 flex flex-col items-center justify-center">
+          {/* شعار المتجر الخارجي */}
+          <div className="h-20 w-full flex items-center justify-center mb-4 p-2 bg-[#F5F5F0] rounded-2xl">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={storeName}
+                className="max-h-12 max-w-[80%] object-contain group-hover:scale-105 transition-transform"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            ) : (
+              <span className="text-sm font-bold text-gray-700">{storeName}</span>
+            )}
+          </div>
+
+          {/* عنوان البحث الخارجي */}
+          <h3 className="text-sm font-bold text-gray-800 line-clamp-2 mb-2 group-hover:text-black">
+            {title}
+          </h3>
+          <p className="text-xs text-gray-400 mb-4">انتقل للموقع الرسمي لـ {storeName}</p>
+        </div>
+
+        {/* زر التوجيه للمتجر الخارجي */}
+        <div className="w-full pt-2">
+          <span className="w-full py-3 px-4 bg-black text-white rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 group-hover:bg-gray-800 transition-colors shadow-sm">
+            <span>التوجه إلى {storeName}</span>
+            <ExternalLink size={14} />
+          </span>
+        </div>
+      </a>
+    );
+  }
+
+  // 2. الكارت الافتراضي للمنتجات المحلية (جكنومة)
   const discount = product.discountPercent || 0;
   const originalPrice = Number(product.price || 0);
   const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : originalPrice;
-  
   const currencySymbol = product.currency || 'AED';
+  const productName = product.name || product.title || 'منتج بدون عنوان';
+
+  // معالجة الصور سواء كانت مصفوفة images أو رابط فردي image
+  const imageList: string[] = Array.isArray(product.images) && product.images.length > 0 
+    ? product.images 
+    : (product.image ? [product.image] : []);
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Just now';
@@ -77,14 +133,14 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Images Slider */}
-          {Array.isArray(product.images) && product.images.length > 0 ? (
+          {/* Images Slider / Single Image */}
+          {imageList.length > 0 ? (
             <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-              {product.images.map((imgUrl, index) => (
+              {imageList.map((imgUrl, index) => (
                 <img
                   key={index}
                   src={imgUrl}
-                  alt={`${product.name} - ${index + 1}`}
+                  alt={`${productName} - ${index + 1}`}
                   className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
@@ -97,7 +153,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Product Information */}
         <div className="flex flex-col px-2 mb-2">
-          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
+          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1">{productName}</h3>
           
           {/* Price */}
           <div className="flex items-center gap-2 mt-1">
@@ -117,7 +173,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             )}
           </div>
 
-          {/* Details Section (بدون رقم الهاتف) */}
+          {/* Details Section */}
           <div className="mt-3 pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-[11px] text-gray-500">
             {/* Seller */}
             <div className="flex items-center gap-1.5">
