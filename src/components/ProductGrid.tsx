@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { useUI } from '../contexts/UIContext';
 import { useTranslation } from 'react-i18next';
 import { useStores } from '../hooks/useStores';
-import { universalSearch } from '../services/storeSearch';
+import { universalSearch, StoreApiConfig } from '../services/storeSearch';
 import { fetchImages } from '../services/imageService';
 
 // 1. دالة التحقق مما إذا كان اشتراك الـ VIP سارياً
@@ -32,22 +32,17 @@ const getCreatedAtTime = (product: any): number => {
     }
     return new Date(product.createdAt).getTime();
   }
-  return 0; // في حال عدم وجود تاريخ إنشاء
+  return 0;
 };
 
 // 3. دالة تحديد الفئة/المستوى للإعلان
 const getProductPriority = (product: any): number => {
-  // المستوى 4: VIP النشط
   if (checkIsVipActive(product)) return 4;
 
-  // المستوى 3: جكنومة الذهبي
   const discountType = (product.discountType || '').toString().toLowerCase();
   if (discountType === 'gold') return 3;
-
-  // المستوى 2: جكنومة الفضي
   if (discountType === 'silver') return 2;
 
-  // المستوى 1: الإعلانات العادية
   return 1;
 };
 
@@ -109,18 +104,44 @@ export default function ProductGrid() {
   useEffect(() => {
     const runSearch = async () => {
       setLoading(true);
-      const storesToSearch = storeFilters.length > 0
+
+      // فلترة المتاجر وتجهيز الكائنات بـ apiUrl و apiKey للمتاجر الخارجية
+      const activeStoresRaw = storeFilters.length > 0
         ? stores.filter(s => storeFilters.includes(s.id) || storeFilters.includes(s.name))
         : stores;
+
+      const storesToSearch: StoreApiConfig[] = activeStoresRaw.map((s: any) => ({
+        id: s.id || s.name?.toLowerCase(),
+        name: s.name,
+        // القيم الافتراضية للربط بحال عدم وجودها داخل قاعدة البيانات المحلية
+        apiUrl: s.apiUrl || (s.name?.toLowerCase().includes('amazon') 
+          ? 'https://real-time-amazon-data.p.rapidapi.com/search' 
+          : s.name?.toLowerCase().includes('ebay') 
+          ? 'https://real-time-ebay-data.p.rapidapi.com/search' 
+          : s.apiUrl),
+        apiKey: s.apiKey || import.meta.env.VITE_RAPIDAPI_KEY || '', // يمكنك وضع مفتاح الـ RapidAPI هنا أو في ملف .env
+        type: s.type || 'external'
+      }));
+
       const results = await universalSearch(queryFilter || '', storesToSearch, localProducts);
       setDisplayProducts(results);
       setLoading(false);
     };
+
     if (localFetched) runSearch();
   }, [queryFilter, localProducts, stores, localFetched, storeFilters.join(",")]);
 
   const filteredProducts = useMemo(() => {
     const filtered = displayProducts.filter((product: any) => {
+      const isExternalProduct = Boolean(product.externalUrl || product.source);
+
+      // إذا كان المنتج خارجياً، نقوم بتقديمه دائماً عند وجود كلمة بحث ويتجاوز فلاتر الأقسام الصارمة
+      if (isExternalProduct && queryFilter) {
+        if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
+        if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
+        return true;
+      }
+
       // 1. التصفية حسب القسم الرئيسي
       if (categoryFilter) {
         const prodCat = (product.category || '').toLowerCase().trim();
@@ -151,23 +172,21 @@ export default function ProductGrid() {
       return true;
     });
 
-    // منطق الترتيب الجديد
+    // منطق الترتيب: VIP -> ذهبي -> فضي -> أحدث
     return filtered.sort((a: any, b: any) => {
       const priorityA = getProductPriority(a);
       const priorityB = getProductPriority(b);
 
-      // إذا كانت مستويات الأولوية مختلفة، يتم الترتيب حسب الأولوية الأعلى أولاً
       if (priorityA !== priorityB) {
         return priorityB - priorityA;
       }
 
-      // إذا كانت الإعلانات من نفس المستوى (مثلاً كلاهما VIP أو كلاهما عادي)، يتم الترتيب بحسب الأحدث أولاً
       const timeA = getCreatedAtTime(a);
       const timeB = getCreatedAtTime(b);
 
-      return timeB - timeA; // الأجدد يظهر في الأعلى
+      return timeB - timeA;
     });
-  }, [displayProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters]);
+  }, [displayProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
 
   return (
     <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
@@ -177,16 +196,22 @@ export default function ProductGrid() {
         ))}
       </div>
 
-      <motion.div
-        variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12"
-      >
-        {filteredProducts.slice(0, visibleCount).map((product) => (
-          <motion.div key={product.id} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-            <ProductCard product={product} />
-          </motion.div>
-        ))}
-      </motion.div>
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+        </div>
+      ) : (
+        <motion.div
+          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12"
+        >
+          {filteredProducts.slice(0, visibleCount).map((product) => (
+            <motion.div key={product.id} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+              <ProductCard product={product} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
       {visibleCount < filteredProducts.length && (
         <div className="flex justify-center mt-12 pb-12 w-full">
