@@ -1,6 +1,4 @@
 import { Product } from '../components/ProductCard';
-import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface StoreApiConfig {
   id: string;
@@ -8,14 +6,61 @@ export interface StoreApiConfig {
   apiUrl?: string;
   apiKey?: string;
   type?: string;
+  affiliateTag?: string;
 }
 
-// 1. دالة مساعدة لاستخراج وتحويل السعر بأمان من مختلف الصيغ
+export interface LegalStoreConfig {
+  id: string;
+  name: string;
+  logo: string;
+  affiliateTag: string;
+  getSearchUrl: (keyword: string, tag: string) => string;
+}
+
+// 1. قائمة المتاجر الخارجية الرسمية مع روابط البحث برمز التسويق بالعمولة (Affiliate)
+export const LEGAL_EXTERNAL_STORES: LegalStoreConfig[] = [
+  {
+    id: 'amazon',
+    name: 'Amazon',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg',
+    affiliateTag: 'jaknooma-20', // ضع رمز Amazon Associates الخاص بك هنا
+    getSearchUrl: (q, tag) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}&tag=${tag}`
+  },
+  {
+    id: 'aliexpress',
+    name: 'AliExpress',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3b/AliExpress_logo.svg',
+    affiliateTag: 'jaknooma_ali', // ضع رمز AliExpress Affiliate الخاص بك هنا
+    getSearchUrl: (q) => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q)}`
+  },
+  {
+    id: 'ebay',
+    name: 'eBay',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/EBay_logo.svg',
+    affiliateTag: '533000000', // ضع campaign ID الخاص بـ eBay Partner Network
+    getSearchUrl: (q, tag) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${tag}`
+  },
+  {
+    id: 'shein',
+    name: 'Shein',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/0/04/SHEIN_LOGO.png',
+    affiliateTag: 'shein_jak',
+    getSearchUrl: (q) => `https://www.shein.com/pdsearch/${encodeURIComponent(q)}`
+  },
+  {
+    id: 'temu',
+    name: 'Temu',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/2/23/Temu_logo.svg',
+    affiliateTag: 'temu_jak',
+    getSearchUrl: (q) => `https://www.temu.com/search_result.html?search_key=${encodeURIComponent(q)}`
+  }
+];
+
+// 2. دالة مساعدة لاستخراج وتحويل السعر بأمان
 const parseSafePrice = (priceVal: any): number => {
   if (!priceVal) return 0;
   if (typeof priceVal === 'number') return priceVal;
-  
-  // إذا كان السعر داخل كائن مثل { value: 19.99, currency: 'USD' }
+
   if (typeof priceVal === 'object' && priceVal.value) {
     return parseSafePrice(priceVal.value);
   }
@@ -25,14 +70,13 @@ const parseSafePrice = (priceVal: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
-// 2. دالة مساعدة لتنظيف واستخراج رابط الصورة الصحيح
+// 3. دالة مساعدة لتنظيف واستخراج رابط الصورة الصحيح
 const parseSafeImage = (item: any): string => {
   if (typeof item.image === 'string' && item.image) return item.image;
   if (typeof item.product_photo === 'string' && item.product_photo) return item.product_photo;
   if (typeof item.thumbnail === 'string' && item.thumbnail) return item.thumbnail;
   if (typeof item.product_main_image_url === 'string' && item.product_main_image_url) return item.product_main_image_url;
-  
-  // لنتائج eBay / RapidAPI القادمة كمصفوفة صور
+
   if (Array.isArray(item.product_photos) && item.product_photos.length > 0) {
     return item.product_photos[0];
   }
@@ -43,108 +87,63 @@ const parseSafeImage = (item: any): string => {
   return '';
 };
 
-// 3. دالة جلب المنتجات الخارجية من المتاجر
-const realExternalSearch = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
-  const searchKeyword = keyword.trim() || 'trending';
-  
+// 4. جلب نتائج من الـ APIs الرسمية والمباشرة للمتاجر (في حال توفرها مستقبلاً بدون RapidAPI)
+const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
   if (!store.apiUrl) return [];
 
   try {
     const url = new URL(store.apiUrl);
-
-    // ضبط استعلامات الـ URL حسب نوع المتجر / API
-    if (url.hostname.includes('real-time-amazon-data')) {
-      url.searchParams.append('query', searchKeyword);
-      url.searchParams.append('page', '1');
-      url.searchParams.append('country', 'US');
-      url.searchParams.append('sort_by', 'RELEVANCE');
-    } else if (url.hostname.includes('real-time-ebay-data')) {
-      url.searchParams.append('q', searchKeyword);
-    } else {
-      url.searchParams.append('q', searchKeyword);
-    }
+    url.searchParams.append('q', keyword);
 
     const headers: Record<string, string> = {
       'Accept': 'application/json'
     };
 
     if (store.apiKey) {
-      if (url.hostname.includes('rapidapi')) {
-        headers['x-rapidapi-host'] = url.hostname;
-        headers['x-rapidapi-key'] = store.apiKey;
-      } else {
-        url.searchParams.append('api_key', store.apiKey);
-      }
+      headers['Authorization'] = `Bearer ${store.apiKey}`;
     }
 
     const response = await fetch(url.toString(), { headers });
 
     if (response.ok) {
       const data = await response.json();
-      let results: any[] = [];
+      const results = Array.isArray(data) ? data : (data.items || data.products || []);
 
-      // استخراج القائمة بناءً على الهيكل المتوقع للاستجابة
-      if (Array.isArray(data)) {
-        results = data;
-      } else if (data.data && Array.isArray(data.data.products)) {
-        results = data.data.products;
-      } else if (data.data && Array.isArray(data.data)) {
-        results = data.data;
-      } else if (Array.isArray(data.results)) {
-        results = data.results;
-      } else if (Array.isArray(data.products)) {
-        results = data.products;
-      } else if (data.items && Array.isArray(data.items)) {
-        results = data.items;
-      }
-
-      if (results.length > 0) {
-        return results.map((item: any) => {
-          const rawPrice = item.price || item.product_price || item.price?.value || item.salePrice || item.price_color;
-          const rawOriginalPrice = item.originalPrice || item.original_price || item.product_original_price;
-          
-          const price = parseSafePrice(rawPrice);
-          const originalPrice = parseSafePrice(rawOriginalPrice);
-          const title = item.title || item.name || item.product_title || '';
-          const imageUrl = parseSafeImage(item);
-
-          return {
-            id: `${store.id}-${item.id || item.asin || Math.random().toString(36).substring(7)}`,
-            title: title,
-            name: title, // دعم لكلا الحقلين لضمان عدم توقف التنسيق
-            price: price > 0 ? price : 10,
-            originalPrice: originalPrice,
-            rating: parseFloat(item.rating || item.product_rating) || 0,
-            reviews: parseInt(item.reviews || item.product_num_ratings || item.num_reviews) || 0,
-            image: imageUrl,
-            category: item.category || store.name,
-            externalUrl: item.url || item.product_url || item.affiliate_link || item.product_offers_page_url || '',
-            storeName: store.name,
-            storeId: store.id,
-            source: store.name.toLowerCase(),
-            isVIP: false,
-            rank: 0,
-            createdAt: new Date().toISOString() // تاريخ افتراضي للتصنيف الأحدث
-          } as Product;
-        }).filter((p: Product) => (p.title || p.name) && p.image);
-      }
+      return results.map((item: any) => ({
+        id: `${store.id}-${item.id || Math.random().toString(36).substring(7)}`,
+        title: item.title || item.name || '',
+        name: item.title || item.name || '',
+        price: parseSafePrice(item.price),
+        originalPrice: parseSafePrice(item.originalPrice),
+        rating: parseFloat(item.rating) || 0,
+        reviews: parseInt(item.reviews) || 0,
+        image: parseSafeImage(item),
+        category: store.name,
+        externalUrl: item.url || item.affiliate_link || '',
+        storeName: store.name,
+        storeId: store.id,
+        source: store.name.toLowerCase(),
+        isVIP: false,
+        rank: 0,
+        createdAt: new Date().toISOString()
+      } as Product));
     }
     return [];
   } catch (error) {
-    console.error(`[Jaknooma External Search Error - ${store.name}]`, error);
+    console.error(`[Jaknooma Official API Error - ${store.name}]`, error);
     return [];
   }
 };
 
-// 4. دالة البحث الموحد المصدّرة
+// 5. دالة البحث الموحد المصدّرة (Universal Search)
 export async function universalSearch(
-  keyword: string, 
-  activeStores: StoreApiConfig[], 
+  keyword: string,
+  activeStores: StoreApiConfig[],
   localProducts: Product[]
 ): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
-  
-  // تصفية المنتجات المحلية أولاً
+
+  // أولاً: تصفية المنتجات المحلية (منتجات جكنومة)
   const localResults = localProducts.filter(p => {
     if (!query) return true;
     const productName = (p.name || p.title || '').toLowerCase();
@@ -152,22 +151,47 @@ export async function universalSearch(
     return productName.includes(query) || productCategory.includes(query);
   });
 
-  if (activeStores.length === 0) {
+  // إذا لم يكن هناك كلمة بحث، نعيد المنتجات المحلية فقط
+  if (!query) {
     return localResults;
   }
 
-  try {
-    // جلب المنتجات من كل المتاجر النشطة بشكل متوازي
-    const externalResultsArrays = await Promise.all(
-      activeStores.map(store => realExternalSearch(store, keyword))
-    );
-    
-    const externalResults = externalResultsArrays.flat();
+  // ثانياً: جلب النتائج من المتاجر الرسمية المضافة عبر الـ API المباشر (إن وجدت)
+  const apiStores = activeStores.filter(s => s.apiUrl && !s.apiUrl.includes('rapidapi'));
+  let apiExternalResults: Product[] = [];
 
-    // دمج المنتجات المحلية مع الخارجية
-    return [...localResults, ...externalResults];
-  } catch (error) {
-    console.error('[Jaknooma Universal Search Error]', error);
-    return localResults;
+  if (apiStores.length > 0) {
+    try {
+      const resultsArrays = await Promise.all(
+        apiStores.map(store => fetchOfficialStoreApi(store, query))
+      );
+      apiExternalResults = resultsArrays.flat();
+    } catch (error) {
+      console.error('[Jaknooma Universal Search API Error]', error);
+    }
   }
+
+  // ثالثاً: توليد بطاقات توجيه البحث الرسمية والقانونية لكل المتاجر العالمية
+  const legalRedirectCards: Product[] = LEGAL_EXTERNAL_STORES.map((store) => {
+    const searchUrl = store.getSearchUrl(query, store.affiliateTag);
+
+    return {
+      id: `ext-redirect-${store.id}-${Date.now()}`,
+      title: `عرض نتائج "${keyword}" على ${store.name}`,
+      name: `عرض نتائج "${keyword}" على ${store.name}`,
+      price: 0,
+      image: store.logo,
+      category: 'متجر خارجي',
+      externalUrl: searchUrl,
+      storeName: store.name,
+      storeId: store.id,
+      isExternal: true, // علامة للتمييز في ProductCard
+      isVIP: false,
+      rank: 0,
+      createdAt: new Date().toISOString()
+    } as any;
+  });
+
+  // دمج النتائج: المحلية + نتائج API الرسمية + بطاقات التوجيه للمتاجر العالمية
+  return [...localResults, ...apiExternalResults, ...legalRedirectCards];
 }
