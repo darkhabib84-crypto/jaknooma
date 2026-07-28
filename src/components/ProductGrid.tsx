@@ -10,12 +10,11 @@ import { useStores } from '../hooks/useStores';
 import { universalSearch } from '../services/storeSearch';
 import { fetchImages } from '../services/imageService';
 
-// دالة مساعدة للتحقق مما إذا كان إعلان الـ VIP ما زال سارياً
+// 1. دالة التحقق مما إذا كان اشتراك الـ VIP سارياً
 const checkIsVipActive = (product: any): boolean => {
   const isVipFlag = Boolean(product.isVIP || product.isVip);
   if (!isVipFlag) return false;
 
-  // إذا لم يكن هناك تاريخ انتهاء محدد، يعتبر غير منتهي (أو يمكنك تعيينه كـ false حسب منطق تطبيقك)
   if (!product.vipExpiry) return true;
 
   const expiryDate = product.vipExpiry.toDate 
@@ -23,6 +22,33 @@ const checkIsVipActive = (product: any): boolean => {
     : new Date(product.vipExpiry);
 
   return expiryDate.getTime() > Date.now();
+};
+
+// 2. دالة لاستخراج تاريخ الإنشاء بصيغة Timestamp (لمقارنة الأحدث)
+const getCreatedAtTime = (product: any): number => {
+  if (product.createdAt) {
+    if (typeof product.createdAt.toDate === 'function') {
+      return product.createdAt.toDate().getTime();
+    }
+    return new Date(product.createdAt).getTime();
+  }
+  return 0; // في حال عدم وجود تاريخ إنشاء
+};
+
+// 3. دالة تحديد الفئة/المستوى للإعلان
+const getProductPriority = (product: any): number => {
+  // المستوى 4: VIP النشط
+  if (checkIsVipActive(product)) return 4;
+
+  // المستوى 3: جكنومة الذهبي
+  const discountType = (product.discountType || '').toString().toLowerCase();
+  if (discountType === 'gold') return 3;
+
+  // المستوى 2: جكنومة الفضي
+  if (discountType === 'silver') return 2;
+
+  // المستوى 1: الإعلانات العادية
+  return 1;
 };
 
 export default function ProductGrid() {
@@ -59,21 +85,14 @@ export default function ProductGrid() {
         const fetchedProducts = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
           const isVipActive = checkIsVipActive(data);
-          let dynamicRank = data.rank || 0;
-
-          if (isVipActive) {
-            dynamicRank = 1000;
-          }
 
           return { 
             id: doc.id, 
             ...data, 
-            isVIP: isVipActive, // يتم تعيينها بـ true فقط إذا كان تاريخ الانتهاء أكبر من الوقت الحالي
-            rank: dynamicRank 
+            isVIP: isVipActive,
           } as Product;
         });
 
-        fetchedProducts.sort((a: any, b: any) => b.rank - a.rank);
         setLocalProducts(fetchedProducts);
         const fetchedImages = await fetchImages();
         setImage(fetchedImages);
@@ -132,22 +151,21 @@ export default function ProductGrid() {
       return true;
     });
 
-    // الترتيب: التحقق الديناميكي المباشر من حالة الـ VIP النشطة
+    // منطق الترتيب الجديد
     return filtered.sort((a: any, b: any) => {
-      const aIsVip = checkIsVipActive(a);
-      const bIsVip = checkIsVipActive(b);
+      const priorityA = getProductPriority(a);
+      const priorityB = getProductPriority(b);
 
-      if (aIsVip && !bIsVip) return -1;
-      if (!aIsVip && bIsVip) return 1;
+      // إذا كانت مستويات الأولوية مختلفة، يتم الترتيب حسب الأولوية الأعلى أولاً
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA;
+      }
 
-      const getScore = (p: any) => {
-        let score = p.rank || 0;
-        if (p.discountType === 'gold') score += 500;
-        if (p.discountType === 'silver') score += 250;
-        return score;
-      };
+      // إذا كانت الإعلانات من نفس المستوى (مثلاً كلاهما VIP أو كلاهما عادي)، يتم الترتيب بحسب الأحدث أولاً
+      const timeA = getCreatedAtTime(a);
+      const timeB = getCreatedAtTime(b);
 
-      return getScore(b) - getScore(a);
+      return timeB - timeA; // الأجدد يظهر في الأعلى
     });
   }, [displayProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters]);
 
