@@ -10,6 +10,21 @@ import { useStores } from '../hooks/useStores';
 import { universalSearch } from '../services/storeSearch';
 import { fetchImages } from '../services/imageService';
 
+// دالة مساعدة للتحقق مما إذا كان إعلان الـ VIP ما زال سارياً
+const checkIsVipActive = (product: any): boolean => {
+  const isVipFlag = Boolean(product.isVIP || product.isVip);
+  if (!isVipFlag) return false;
+
+  // إذا لم يكن هناك تاريخ انتهاء محدد، يعتبر غير منتهي (أو يمكنك تعيينه كـ false حسب منطق تطبيقك)
+  if (!product.vipExpiry) return true;
+
+  const expiryDate = product.vipExpiry.toDate 
+    ? product.vipExpiry.toDate() 
+    : new Date(product.vipExpiry);
+
+  return expiryDate.getTime() > Date.now();
+};
+
 export default function ProductGrid() {
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
   const [image, setImage] = useState<any[]>([]);
@@ -22,7 +37,7 @@ export default function ProductGrid() {
   const { t } = useTranslation();
   const { stores } = useStores();
 
-  // جلب الفلاتر من الـ URL (بما فيها القسم الفرعي sub)
+  // جلب الفلاتر من الـ URL
   const categoryFilter = searchParams.get('category');
   const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
@@ -40,29 +55,20 @@ export default function ProductGrid() {
       try {
         const q = query(collection(db, 'products'));
         const querySnapshot = await getDocs(q);
-        const now = new Date();
 
         const fetchedProducts = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
+          const isVipActive = checkIsVipActive(data);
           let dynamicRank = data.rank || 0;
 
-          // دعم كل من isVIP و isVip بغض النظر عن حالة الأحرف
-          const isVipStatus = Boolean(data.isVIP || data.isVip);
-
-          if (isVipStatus) {
-            if (data.vipExpiry) {
-              const expiryDate = data.vipExpiry.toDate ? data.vipExpiry.toDate() : new Date(data.vipExpiry);
-              if (expiryDate > now) dynamicRank = 1000;
-            } else {
-              // في حال تم تفعيل الـ VIP بدون تحديد تاريخ انتهاء
-              dynamicRank = 1000;
-            }
+          if (isVipActive) {
+            dynamicRank = 1000;
           }
 
           return { 
             id: doc.id, 
             ...data, 
-            isVIP: isVipStatus, // توحيد الحقل في الكائن الداخلي
+            isVIP: isVipActive, // يتم تعيينها بـ true فقط إذا كان تاريخ الانتهاء أكبر من الوقت الحالي
             rank: dynamicRank 
           } as Product;
         });
@@ -96,7 +102,7 @@ export default function ProductGrid() {
 
   const filteredProducts = useMemo(() => {
     const filtered = displayProducts.filter((product: any) => {
-      // 1. التصفية حسب القسم الرئيسي (مثل Cars & Automotive Brands)
+      // 1. التصفية حسب القسم الرئيسي
       if (categoryFilter) {
         const prodCat = (product.category || '').toLowerCase().trim();
         const targetCat = categoryFilter.toLowerCase().trim();
@@ -109,7 +115,7 @@ export default function ProductGrid() {
         if (!isCategoryMatch) return false;
       }
 
-      // 2. التصفية حسب القسم الفرعي (حقل subCategory أو subcategory أو sub في الفايرستور)
+      // 2. التصفية حسب القسم الفرعي
       if (subCategoryFilter) {
         const productSub = product.subCategory || product.subcategory || product.sub;
         if (!productSub) return false;
@@ -126,10 +132,10 @@ export default function ProductGrid() {
       return true;
     });
 
-    // الترتيب: إعلانات الـ VIP تظهر دائماً في الأعلى أولاً
+    // الترتيب: التحقق الديناميكي المباشر من حالة الـ VIP النشطة
     return filtered.sort((a: any, b: any) => {
-      const aIsVip = Boolean(a.isVIP || a.isVip || a.rank >= 1000);
-      const bIsVip = Boolean(b.isVIP || b.isVip || b.rank >= 1000);
+      const aIsVip = checkIsVipActive(a);
+      const bIsVip = checkIsVipActive(b);
 
       if (aIsVip && !bIsVip) return -1;
       if (!aIsVip && bIsVip) return 1;
