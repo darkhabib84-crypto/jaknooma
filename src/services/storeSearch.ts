@@ -7,9 +7,43 @@ export interface StoreApiConfig {
   name: string;
   apiUrl?: string;
   apiKey?: string;
-  type: string;
+  type?: string;
 }
 
+// 1. دالة مساعدة لاستخراج وتحويل السعر بأمان من مختلف الصيغ
+const parseSafePrice = (priceVal: any): number => {
+  if (!priceVal) return 0;
+  if (typeof priceVal === 'number') return priceVal;
+  
+  // إذا كان السعر داخل كائن مثل { value: 19.99, currency: 'USD' }
+  if (typeof priceVal === 'object' && priceVal.value) {
+    return parseSafePrice(priceVal.value);
+  }
+
+  const cleanString = String(priceVal).replace(/[^\d.]/g, '');
+  const parsed = parseFloat(cleanString);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// 2. دالة مساعدة لتنظيف واستخراج رابط الصورة الصحيح
+const parseSafeImage = (item: any): string => {
+  if (typeof item.image === 'string' && item.image) return item.image;
+  if (typeof item.product_photo === 'string' && item.product_photo) return item.product_photo;
+  if (typeof item.thumbnail === 'string' && item.thumbnail) return item.thumbnail;
+  if (typeof item.product_main_image_url === 'string' && item.product_main_image_url) return item.product_main_image_url;
+  
+  // لنتائج eBay / RapidAPI القادمة كمصفوفة صور
+  if (Array.isArray(item.product_photos) && item.product_photos.length > 0) {
+    return item.product_photos[0];
+  }
+  if (Array.isArray(item.image_urls) && item.image_urls.length > 0) {
+    return item.image_urls[0];
+  }
+
+  return '';
+};
+
+// 3. دالة جلب المنتجات الخارجية من المتاجر
 const realExternalSearch = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
   const searchKeyword = keyword.trim() || 'trending';
   
@@ -18,6 +52,7 @@ const realExternalSearch = async (store: StoreApiConfig, keyword: string): Promi
   try {
     const url = new URL(store.apiUrl);
 
+    // ضبط استعلامات الـ URL حسب نوع المتجر / API
     if (url.hostname.includes('real-time-amazon-data')) {
       url.searchParams.append('query', searchKeyword);
       url.searchParams.append('page', '1');
@@ -46,8 +81,9 @@ const realExternalSearch = async (store: StoreApiConfig, keyword: string): Promi
 
     if (response.ok) {
       const data = await response.json();
-      let results = [];
+      let results: any[] = [];
 
+      // استخراج القائمة بناءً على الهيكل المتوقع للاستجابة
       if (Array.isArray(data)) {
         results = data;
       } else if (data.data && Array.isArray(data.data.products)) {
@@ -63,76 +99,75 @@ const realExternalSearch = async (store: StoreApiConfig, keyword: string): Promi
       }
 
       if (results.length > 0) {
-        // دالة مساعدة لتنظيف السعر وتحويله لرقم بشكل آمن
-        const parseSafePrice = (priceVal: any): number => {
-          if (!priceVal) return 0;
-          if (typeof priceVal === 'number') return priceVal;
-          // إزالة أي رموز مثل $, AED, الفواصل، والنصوص ليبقى الرقم فقط
-          const cleanString = String(priceVal).replace(/[^\d.]/g, '');
-          const parsed = parseFloat(cleanString);
-          return isNaN(parsed) ? 0 : parsed;
-        };
-
         return results.map((item: any) => {
           const rawPrice = item.price || item.product_price || item.price?.value || item.salePrice || item.price_color;
           const rawOriginalPrice = item.originalPrice || item.original_price || item.product_original_price;
           
           const price = parseSafePrice(rawPrice);
           const originalPrice = parseSafePrice(rawOriginalPrice);
+          const title = item.title || item.name || item.product_title || '';
+          const imageUrl = parseSafeImage(item);
 
           return {
             id: `${store.id}-${item.id || item.asin || Math.random().toString(36).substring(7)}`,
-            name: item.title || item.name || item.product_title || '',
-            price: price > 0 ? price : 10, // وضع سعر افتراضي إذا فشل تماماً حتى لا يختفي المنتج
+            title: title,
+            name: title, // دعم لكلا الحقلين لضمان عدم توقف التنسيق
+            price: price > 0 ? price : 10,
             originalPrice: originalPrice,
             rating: parseFloat(item.rating || item.product_rating) || 0,
             reviews: parseInt(item.reviews || item.product_num_ratings || item.num_reviews) || 0,
-            image: item.image || item.product_photo || item.thumbnail || item.product_main_image_url || '',
+            image: imageUrl,
             category: item.category || store.name,
-            externalUrl: item.url || item.product_url || item.affiliate_link || '',
+            externalUrl: item.url || item.product_url || item.affiliate_link || item.product_offers_page_url || '',
             storeName: store.name,
             storeId: store.id,
             source: store.name.toLowerCase(),
-            isVIP: false
-          };
-        }).filter((p: Product) => p.name && p.image); // أزلنا شرط السعر الصارم مؤقتاً لضمان ظهور المنتجات
+            isVIP: false,
+            rank: 0,
+            createdAt: new Date().toISOString() // تاريخ افتراضي للتصنيف الأحدث
+          } as Product;
+        }).filter((p: Product) => (p.title || p.name) && p.image);
       }
     }
     return [];
   } catch (error) {
-    console.error(`[Jaknooma Error]`, error);
+    console.error(`[Jaknooma External Search Error - ${store.name}]`, error);
     return [];
   }
 };
 
-
-   
-
-
-export async function universalSearch(keyword: string, activeStores: StoreApiConfig[], localProducts: Product[]): Promise<Product[]> {
+// 4. دالة البحث الموحد المصدّرة
+export async function universalSearch(
+  keyword: string, 
+  activeStores: StoreApiConfig[], 
+  localProducts: Product[]
+): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
   
-  // 1. Filter local Firestore products
+  // تصفية المنتجات المحلية أولاً
   const localResults = localProducts.filter(p => {
     if (!query) return true;
-    return p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query);
+    const productName = (p.name || p.title || '').toLowerCase();
+    const productCategory = (p.category || '').toLowerCase();
+    return productName.includes(query) || productCategory.includes(query);
   });
 
-  // 2. Fetch from external stores
-  const externalStores = activeStores;
-  
-  if (externalStores.length === 0) {
+  if (activeStores.length === 0) {
     return localResults;
   }
 
   try {
+    // جلب المنتجات من كل المتاجر النشطة بشكل متوازي
     const externalResultsArrays = await Promise.all(
-      externalStores.map(store => realExternalSearch(store, keyword))
+      activeStores.map(store => realExternalSearch(store, keyword))
     );
     
     const externalResults = externalResultsArrays.flat();
+
+    // دمج المنتجات المحلية مع الخارجية
     return [...localResults, ...externalResults];
   } catch (error) {
+    console.error('[Jaknooma Universal Search Error]', error);
     return localResults;
   }
 }
