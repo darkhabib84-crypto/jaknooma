@@ -51,7 +51,7 @@ export default function ProductGrid() {
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
 
-  // جلب الفلاتر وكلمة البحث من الـ URL فقط
+  // جلب الفلاتر وكلمة البحث من الـ URL
   const categoryFilter = searchParams.get('category');
   const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
@@ -63,7 +63,7 @@ export default function ProductGrid() {
     setVisibleCount(12);
   }, [queryFilter, categoryFilter, subCategoryFilter]);
 
-  // جلب المنتجات والصور من قاعدة البيانات المحلية
+  // جلب المنتجات من Firebase (سواء المحفوظة من المستخدم أو من الـ AI Agent)
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -94,21 +94,30 @@ export default function ProductGrid() {
     fetchData();
   }, []);
 
-  // فلترة المنتجات محلياً بناءً على الاستعلام والأقسام
+  // فلترة المنتجات شاملة جميع الحقول المراد البحث فيها
   const filteredProducts = useMemo(() => {
-    const filtered = localProducts.filter((product: any) => {
-      // 1. فلترة نص البحث (Search Query)
+    return localProducts.filter((product: any) => {
+      // 1. فلترة نص البحث (البحث في الاسم، العنوان العربي/الإنجليزي، الوصف، الكلمات المفتاحية)
       if (queryFilter) {
-        const title = (product.title || product.name || '').toLowerCase();
-        const description = (product.description || '').toLowerCase();
-        const category = (product.category || '').toLowerCase();
-        
-        const matchesQuery = 
-          title.includes(queryFilter) || 
-          description.includes(queryFilter) || 
-          category.includes(queryFilter);
+        const searchPool = [
+          product.title,
+          product.name,
+          product.title_ar,
+          product.productName,
+          product.description,
+          product.category,
+          product.storeName,
+          ...(Array.isArray(product.tags) ? product.tags : []),
+          ...(Array.isArray(product.keywords) ? product.keywords : [])
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
 
-        if (!matchesQuery) return false;
+        // مطابقة الكلمة المطلوبة أو أجزاء منها
+        if (!searchPool.includes(queryFilter)) {
+          return false;
+        }
       }
 
       // 2. التصفية حسب القسم الرئيسي
@@ -134,15 +143,14 @@ export default function ProductGrid() {
       }
 
       // 4. التصفية حسب السعر والمتاجر
-      if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
-      if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
+      const productPrice = Number(product.price || 0);
+      if (minPriceFilter && productPrice < Number(minPriceFilter)) return false;
+      if (maxPriceFilter && productPrice > Number(maxPriceFilter)) return false;
       if (storeFilters.length > 0 && !storeFilters.includes(product.storeId) && !storeFilters.includes(product.storeName)) return false;
 
       return true;
-    });
-
-    // منطق الترتيب: VIP -> ذهبي -> فضي -> أحدث
-    return filtered.sort((a: any, b: any) => {
+    }).sort((a: any, b: any) => {
+      // منطق الترتيب: VIP -> ذهبي -> فضي -> أحدث
       const priorityA = getProductPriority(a);
       const priorityB = getProductPriority(b);
 
@@ -159,15 +167,23 @@ export default function ProductGrid() {
 
   return (
     <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        {image.map((item) => (
-          <img key={item.id} src={item.url} alt={item.alt} className="w-full h-auto rounded-lg shadow-md" />
-        ))}
-      </div>
+      {image.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {image.map((item) => (
+            <img key={item.id} src={item.url} alt={item.alt} className="w-full h-auto rounded-lg shadow-md" />
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center items-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-lg text-gray-500 font-medium">
+            {t('لا توجد نتائج تطابق بحثك حالياً')}
+          </p>
         </div>
       ) : (
         <motion.div
@@ -177,7 +193,7 @@ export default function ProductGrid() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12"
         >
           {filteredProducts.slice(0, visibleCount).map((product) => (
-            <motion.div key={product.id} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
+            <motion.div key={product.id || product.title} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
               <ProductCard product={product} />
             </motion.div>
           ))}
