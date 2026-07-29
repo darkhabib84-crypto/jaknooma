@@ -4,7 +4,6 @@ import ProductCard, { Product } from './ProductCard';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
-import { useUI } from '../contexts/UIContext';
 import { useTranslation } from 'react-i18next';
 import { useStores } from '../hooks/useStores';
 import { universalSearch, StoreApiConfig } from '../services/storeSearch';
@@ -54,17 +53,18 @@ export default function ProductGrid() {
   const [localFetched, setLocalFetched] = useState(false);
   const [visibleCount, setVisibleCount] = useState(12);
   const [searchParams] = useSearchParams();
-  const { searchQuery } = useUI();
   const { t } = useTranslation();
   const { stores } = useStores();
 
-  // جلب الفلاتر من الـ URL
+  // جلب الفلاتر من الـ URL فقط لمنع الاستدعاء الحثيث مع كل حرف
   const categoryFilter = searchParams.get('category');
   const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
   const maxPriceFilter = searchParams.get('maxPrice');
   const storeFilters = searchParams.getAll('store');
-  const queryFilter = searchParams.get('q') || searchQuery;
+  
+  // الاعتماد المباشر على قيمة q الممررة عبر الرابط بعد الضغط على زر البحث
+  const queryFilter = searchParams.get('q') || '';
 
   useEffect(() => {
     setVisibleCount(12);
@@ -113,22 +113,30 @@ export default function ProductGrid() {
       const storesToSearch: StoreApiConfig[] = activeStoresRaw.map((s: any) => ({
         id: s.id || s.name?.toLowerCase(),
         name: s.name,
-        // القيم الافتراضية للربط بحال عدم وجودها داخل قاعدة البيانات المحلية
         apiUrl: s.apiUrl || (s.name?.toLowerCase().includes('amazon') 
           ? 'https://real-time-amazon-data.p.rapidapi.com/search' 
           : s.name?.toLowerCase().includes('ebay') 
           ? 'https://real-time-ebay-data.p.rapidapi.com/search' 
           : s.apiUrl),
-        apiKey: s.apiKey || import.meta.env.VITE_RAPIDAPI_KEY || '', // يمكنك وضع مفتاح الـ RapidAPI هنا أو في ملف .env
+        apiKey: s.apiKey || import.meta.env.VITE_RAPIDAPI_KEY || '',
         type: s.type || 'external'
       }));
 
-      const results = await universalSearch(queryFilter || '', storesToSearch, localProducts);
-      setDisplayProducts(results);
-      setLoading(false);
+      try {
+        // تنفيذ البحث الشامل فقط إذا كانت القيمة المرسلة عبر الـ URL غير فارغة
+        const results = await universalSearch(queryFilter.trim(), storesToSearch, localProducts);
+        setDisplayProducts(results);
+      } catch (err) {
+        console.error("Error executing universal search:", err);
+        setDisplayProducts(localProducts);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if (localFetched) runSearch();
+    if (localFetched) {
+      runSearch();
+    }
   }, [queryFilter, localProducts, stores, localFetched, storeFilters.join(",")]);
 
   const filteredProducts = useMemo(() => {
@@ -202,6 +210,8 @@ export default function ProductGrid() {
         </div>
       ) : (
         <motion.div
+          initial="hidden"
+          animate="visible"
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12"
         >
