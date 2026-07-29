@@ -16,39 +16,33 @@ export async function searchWithAgent(query: string): Promise<ExternalProductRes
   const cleanQuery = query.trim();
 
   try {
-    // تشغيل الـ Scraping للخدمات بالتوازي من المتصفح
     const results = await Promise.allSettled([
       scrapeAmazonWeb(cleanQuery),
       scrapeEbayWeb(cleanQuery)
     ]);
 
-    const allProducts: ExternalProductResult[] = results
+    return results
       .filter((r): r is PromiseFulfilledResult<ExternalProductResult[]> => r.status === 'fulfilled')
       .flatMap(r => r.value);
-
-    return allProducts;
   } catch (error) {
     console.error('Failed to search via AI Agent:', error);
     return [];
   }
 }
 
-// 1. جلب منتجات أمازون عبر CORS Proxy
 async function scrapeAmazonWeb(query: string): Promise<ExternalProductResult[]> {
   try {
     const targetUrl = `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=jaknooma-20`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    // استخدام proxy متوافق مع CORS للمستضافات الخارجية
+    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) return [];
 
-    const data = await response.json();
-    const html = data.contents;
+    const html = await response.text();
     if (!html) return [];
 
     const products: ExternalProductResult[] = [];
-    
-    // استخراج أسماء وأسعار وصور المنتجات باستخدام RegEx خفيف
     const itemRegex = /data-asin="([A-Z0-9]{10})".*?class="a-size-[^"]*a-color-base a-text-normal">(.*?)<\/span>.*?class="a-price-whole">(.*?)<\/span>/gs;
     
     let match;
@@ -61,7 +55,7 @@ async function scrapeAmazonWeb(query: string): Promise<ExternalProductResult[]> 
 
       const imgRegex = new RegExp(`data-asin="${asin}".*?src="(https://m.media-amazon.com/images/I/[^"]+)"`, 's');
       const imgMatch = imgRegex.exec(html);
-      const image = imgMatch ? imgMatch[1] : 'https://via.placeholder.com/150';
+      const image = imgMatch ? imgMatch[1] : '';
 
       if (asin && title && price > 0) {
         products.push({
@@ -84,17 +78,15 @@ async function scrapeAmazonWeb(query: string): Promise<ExternalProductResult[]> 
   }
 }
 
-// 2. جلب منتجات إيباي عبر CORS Proxy
 async function scrapeEbayWeb(query: string): Promise<ExternalProductResult[]> {
   try {
     const targetUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sacat=0`;
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`;
 
     const response = await fetch(proxyUrl);
     if (!response.ok) return [];
 
-    const data = await response.json();
-    const html = data.contents;
+    const html = await response.text();
     if (!html) return [];
 
     const products: ExternalProductResult[] = [];
@@ -112,7 +104,7 @@ async function scrapeEbayWeb(query: string): Promise<ExternalProductResult[]> {
           id: `ebay-${Date.now()}-${count}`,
           title: title,
           price: price,
-          image: 'https://via.placeholder.com/150',
+          image: '',
           externalUrl: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(title)}&campid=533000000`,
           storeName: 'eBay',
           isExternal: true
