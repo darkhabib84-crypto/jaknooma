@@ -49,10 +49,12 @@ export const LEGAL_EXTERNAL_STORES: LegalStoreConfig[] = [
   }
 ];
 
-// رابط خادم الـ AI Agent الخاص بجكنومة (استبدل المسار برابط سيرفرك أو دالة Vercel)
+// رابط الـ Agent الخاص بك أو endpoint الخادم
 const SEARCH_AGENT_URL = '/api/search-agent';
 
-// دالة مساعدة لاستخراج وتنظيف السعر
+// مفتاح RapidAPI الخاص بك (إذا كنت تدعو RapidAPI مباشرة من الواجهة)
+const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE'; 
+
 const parseSafePrice = (priceVal: any): number => {
   if (!priceVal) return 0;
   if (typeof priceVal === 'number') return priceVal;
@@ -63,7 +65,6 @@ const parseSafePrice = (priceVal: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
-// دالة مساعدة لاستخراج رابط الصورة
 const parseSafeImage = (item: any): string => {
   if (typeof item.image === 'string' && item.image) return item.image;
   if (typeof item.product_photo === 'string' && item.product_photo) return item.product_photo;
@@ -77,7 +78,7 @@ const parseSafeImage = (item: any): string => {
   return '';
 };
 
-// 1. جلب البيانات من الـ APIs المباشرة للمتاجر (في حال توفر رابط API خاص بالمتجر)
+// 1. طلب متجر موجه لـ RapidAPI بمعالجة آمنة للاستجابة
 const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
   if (!store.apiUrl) return [];
 
@@ -89,47 +90,59 @@ const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Pr
       'Accept': 'application/json'
     };
 
-    if (store.apiKey) {
+    // إذا كان الرابط يخص RapidAPI نمرر الهيدرز المطلوبة لمنع خطأ 401
+    if (store.apiUrl.includes('rapidapi.com')) {
+      headers['x-rapidapi-key'] = store.apiKey || RAPID_API_KEY;
+      headers['x-rapidapi-host'] = url.hostname;
+    } else if (store.apiKey) {
       headers['Authorization'] = `Bearer ${store.apiKey}`;
     }
 
     const response = await fetch(url.toString(), { headers });
 
-    if (response.ok) {
+    // التحقق من أن الاستجابة ناجحة ومن نوع JSON لمنع خطأ SyntaxError
+    const contentType = response.headers.get('content-type');
+    if (response.ok && contentType && contentType.includes('application/json')) {
       const data = await response.json();
-      const results = Array.isArray(data) ? data : (data.items || data.products || data.results || []);
+      const results = Array.isArray(data) ? data : (data.items || data.products || data.results || data.data || []);
 
       return results.map((item: any) => ({
-        id: `${store.id}-${item.id || item.productId || Math.random().toString(36).substring(7)}`,
-        title: item.title || item.name || item.product_title || '',
-        name: item.title || item.name || item.product_title || '',
-        price: parseSafePrice(item.price || item.price_final || item.offer_price),
-        originalPrice: parseSafePrice(item.originalPrice || item.price_original),
-        rating: parseFloat(item.rating) || 0,
-        reviews: parseInt(item.reviews) || 0,
+        id: `${store.id}-${item.id || item.asin || item.itemId || Math.random().toString(36).substring(7)}`,
+        title: item.title || item.product_title || item.name || '',
+        name: item.title || item.product_title || item.name || '',
+        price: parseSafePrice(item.price || item.product_price || item.offer_price),
+        originalPrice: parseSafePrice(item.originalPrice || item.product_original_price),
+        rating: parseFloat(item.rating || item.product_star_rating) || 0,
+        reviews: parseInt(item.reviews || item.product_num_ratings) || 0,
         image: parseSafeImage(item),
         images: [parseSafeImage(item)],
         category: store.name,
-        externalUrl: item.url || item.product_url || item.affiliate_link || item.item_url || '',
+        externalUrl: item.url || item.product_url || item.affiliate_link || item.product_page_url || '',
         storeName: store.name,
         storeId: store.id,
         isExternalProduct: true,
         isVIP: false,
         createdAt: new Date().toISOString()
       } as Product));
+    } else {
+      console.warn(`[Jaknooma API Skip] ${store.name} responded with status ${response.status}`);
+      return [];
     }
-    return [];
   } catch (error) {
     console.error(`[Jaknooma API Error - ${store.name}]`, error);
     return [];
   }
 };
 
-// 2. جلب البيانات باستخدام الـ AI Search Agent الخاص بالبحث في المتاجر الخارجية
+// 2. جلب النتائج من الـ Agent مع حماية من الأخطاء
 const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
   try {
     const response = await fetch(`${SEARCH_AGENT_URL}?q=${encodeURIComponent(keyword)}`);
-    if (!response.ok) return [];
+    
+    const contentType = response.headers.get('content-type');
+    if (!response.ok || !contentType || !contentType.includes('application/json')) {
+      return [];
+    }
 
     const data = await response.json();
     if (!data.success || !Array.isArray(data.products)) return [];
@@ -159,7 +172,6 @@ const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
   }
 };
 
-// دالة البحث الموحد (Universal Search)
 export async function universalSearch(
   keyword: string,
   activeStores: StoreApiConfig[],
@@ -167,7 +179,7 @@ export async function universalSearch(
 ): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
 
-  // 1. تصفية المنتجات المحلية في جكنومة
+  // تصفية المنتجات المحلية
   const localResults = localProducts.filter(p => {
     if (!query) return true;
     const productName = (p.name || p.title || '').toLowerCase();
@@ -179,7 +191,7 @@ export async function universalSearch(
     return localResults;
   }
 
-  // 2. البحث في المتاجر المربوطة بـ API مباشر (إن وجدت)
+  // البحث عبر APIs المتاجر الفعالة
   const apiStores = activeStores.filter(s => s.apiUrl);
   let directApiResults: Product[] = [];
 
@@ -194,9 +206,8 @@ export async function universalSearch(
     }
   }
 
-  // 3. البحث باستخدام AI Search Agent لجلب باقي نتائج المتاجر العالمية
+  // جلب نتائج الـ AI Agent
   const agentResults = await fetchAgentResults(query);
 
-  // دمج النتائج بدون تكرار (المحلية + الـ Direct APIs + الـ AI Agent)
   return [...localResults, ...directApiResults, ...agentResults];
 }
