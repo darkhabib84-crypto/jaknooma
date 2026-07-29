@@ -49,7 +49,10 @@ export const LEGAL_EXTERNAL_STORES: LegalStoreConfig[] = [
   }
 ];
 
-// دالة مساعدة لاستخراج وتنظيف السعر من استجابة الـ API الرسمية
+// رابط خادم الـ AI Agent الخاص بجكنومة (استبدل المسار برابط سيرفرك أو دالة Vercel)
+const SEARCH_AGENT_URL = '/api/search-agent';
+
+// دالة مساعدة لاستخراج وتنظيف السعر
 const parseSafePrice = (priceVal: any): number => {
   if (!priceVal) return 0;
   if (typeof priceVal === 'number') return priceVal;
@@ -60,7 +63,7 @@ const parseSafePrice = (priceVal: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
-// دالة مساعدة لاستخراج رابط الصورة الحقيقي من الـ API
+// دالة مساعدة لاستخراج رابط الصورة
 const parseSafeImage = (item: any): string => {
   if (typeof item.image === 'string' && item.image) return item.image;
   if (typeof item.product_photo === 'string' && item.product_photo) return item.product_photo;
@@ -74,7 +77,7 @@ const parseSafeImage = (item: any): string => {
   return '';
 };
 
-// جلب البيانات الحقيقية فقط من الـ APIs الخاصة بالمتاجر الخارجيّة
+// 1. جلب البيانات من الـ APIs المباشرة للمتاجر (في حال توفر رابط API خاص بالمتجر)
 const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
   if (!store.apiUrl) return [];
 
@@ -122,7 +125,41 @@ const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Pr
   }
 };
 
-// دالة البحث الموحد (Universal Search) - حقيقية 100% بدون Mock Data
+// 2. جلب البيانات باستخدام الـ AI Search Agent الخاص بالبحث في المتاجر الخارجية
+const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
+  try {
+    const response = await fetch(`${SEARCH_AGENT_URL}?q=${encodeURIComponent(keyword)}`);
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.products)) return [];
+
+    return data.products.map((item: any) => ({
+      id: item.id || `agent-${Math.random().toString(36).substring(7)}`,
+      title: item.name || item.title || '',
+      name: item.name || item.title || '',
+      price: parseSafePrice(item.price),
+      originalPrice: parseSafePrice(item.originalPrice || item.price),
+      rating: 4.5,
+      reviews: 0,
+      image: parseSafeImage(item),
+      images: [parseSafeImage(item)],
+      category: item.storeName || 'متجر خارجي',
+      externalUrl: item.externalUrl || '',
+      storeName: item.storeName || 'متجر خارجي',
+      sellerName: item.storeName || 'متجر خارجي',
+      location: 'شحن دولي',
+      isExternalProduct: true,
+      isVIP: false,
+      createdAt: new Date().toISOString()
+    } as Product));
+  } catch (error) {
+    console.error('[Jaknooma AI Agent Search Error]', error);
+    return [];
+  }
+};
+
+// دالة البحث الموحد (Universal Search)
 export async function universalSearch(
   keyword: string,
   activeStores: StoreApiConfig[],
@@ -130,7 +167,7 @@ export async function universalSearch(
 ): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
 
-  // 1. تصفية المنتجات المحلية المرفوعة في جكنومة
+  // 1. تصفية المنتجات المحلية في جكنومة
   const localResults = localProducts.filter(p => {
     if (!query) return true;
     const productName = (p.name || p.title || '').toLowerCase();
@@ -142,21 +179,24 @@ export async function universalSearch(
     return localResults;
   }
 
-  // 2. جلب النتائج من المتاجر الخارجية التي تم تزويدها بـ apiUrl فعلي
+  // 2. البحث في المتاجر المربوطة بـ API مباشر (إن وجدت)
   const apiStores = activeStores.filter(s => s.apiUrl);
-  let apiExternalResults: Product[] = [];
+  let directApiResults: Product[] = [];
 
   if (apiStores.length > 0) {
     try {
       const resultsArrays = await Promise.all(
         apiStores.map(store => fetchOfficialStoreApi(store, query))
       );
-      apiExternalResults = resultsArrays.flat();
+      directApiResults = resultsArrays.flat();
     } catch (error) {
-      console.error('[Jaknooma Universal Search API Error]', error);
+      console.error('[Jaknooma Direct API Error]', error);
     }
   }
 
-  // إرجاع النتائج الحقيقية فقط (المحلية + المتاجر المربوطة بـ API)
-  return [...localResults, ...apiExternalResults];
+  // 3. البحث باستخدام AI Search Agent لجلب باقي نتائج المتاجر العالمية
+  const agentResults = await fetchAgentResults(query);
+
+  // دمج النتائج بدون تكرار (المحلية + الـ Direct APIs + الـ AI Agent)
+  return [...localResults, ...directApiResults, ...agentResults];
 }
