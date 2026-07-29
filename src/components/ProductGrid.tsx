@@ -6,22 +6,18 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { fetchImages } from '../services/imageService';
+import { searchWithAgent } from '../services/agentService'; // استدعاء خدمة الـ AI Agent
 
-// 1. دالة التحقق مما إذا كان اشتراك الـ VIP سارياً
 const checkIsVipActive = (product: any): boolean => {
   const isVipFlag = Boolean(product.isVIP || product.isVip);
   if (!isVipFlag) return false;
-
   if (!product.vipExpiry) return true;
-
   const expiryDate = product.vipExpiry.toDate 
     ? product.vipExpiry.toDate() 
     : new Date(product.vipExpiry);
-
   return expiryDate.getTime() > Date.now();
 };
 
-// 2. دالة لاستخراج تاريخ الإنشاء بصيغة Timestamp (لمقارنة الأحدث)
 const getCreatedAtTime = (product: any): number => {
   if (product.createdAt) {
     if (typeof product.createdAt.toDate === 'function') {
@@ -32,26 +28,24 @@ const getCreatedAtTime = (product: any): number => {
   return 0;
 };
 
-// 3. دالة تحديد الفئة/المستوى للإعلان
 const getProductPriority = (product: any): number => {
   if (checkIsVipActive(product)) return 4;
-
   const discountType = (product.discountType || '').toString().toLowerCase();
   if (discountType === 'gold') return 3;
   if (discountType === 'silver') return 2;
-
   return 1;
 };
 
 export default function ProductGrid() {
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
+  const [agentProducts, setAgentProducts] = useState<Product[]>([]);
   const [image, setImage] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [agentLoading, setAgentLoading] = useState(false);
   const [visibleCount, setVisibleCount] = useState(12);
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
 
-  // جلب الفلاتر وكلمة البحث من الـ URL
   const categoryFilter = searchParams.get('category');
   const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
@@ -63,7 +57,7 @@ export default function ProductGrid() {
     setVisibleCount(12);
   }, [queryFilter, categoryFilter, subCategoryFilter]);
 
-  // جلب المنتجات من Firebase (سواء المحفوظة من المستخدم أو من الـ AI Agent)
+  // 1. جلب المنتجات المحلية من Firestore
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -73,12 +67,10 @@ export default function ProductGrid() {
 
         const fetchedProducts = querySnapshot.docs.map(doc => {
           const data = doc.data() as any;
-          const isVipActive = checkIsVipActive(data);
-
           return { 
             id: doc.id, 
             ...data, 
-            isVIP: isVipActive,
+            isVIP: checkIsVipActive(data),
           } as Product;
         });
 
@@ -94,10 +86,46 @@ export default function ProductGrid() {
     fetchData();
   }, []);
 
-  // فلترة المنتجات شاملة جميع الحقول المراد البحث فيها
+  // 2. إذا كانت كلمة البحث موجودة، نطلب من الـ AI Agent جلب المنتجات تلقائياً
+  useEffect(() => {
+    if (!queryFilter) {
+      setAgentProducts([]);
+      return;
+    }
+
+    const fetchFromAgent = async () => {
+      setAgentLoading(true);
+      try {
+        const results = await searchWithAgent(queryFilter);
+        setAgentProducts(results || []);
+      } catch (err) {
+        console.error('[AI Agent Error]:', err);
+      } finally {
+        setAgentLoading(false);
+      }
+    };
+
+    fetchFromAgent();
+  }, [queryFilter]);
+
+  // دمج المنتجات المحلية مع منتجات الـ AI Agent وفلترتها
+  const allProducts = useMemo(() => {
+    const combined = [...localProducts, ...agentProducts];
+    
+    // إزالة التكرار بالـ id أو العنوان
+    const uniqueMap = new Map();
+    combined.forEach(p => {
+      const key = p.id || p.title || p.name;
+      if (key && !uniqueMap.has(key)) {
+        uniqueMap.set(key, p);
+      }
+    });
+
+    return Array.from(uniqueMap.values());
+  }, [localProducts, agentProducts]);
+
   const filteredProducts = useMemo(() => {
-    return localProducts.filter((product: any) => {
-      // 1. فلترة نص البحث (البحث في الاسم، العنوان العربي/الإنجليزي، الوصف، الكلمات المفتاحية)
+    return allProducts.filter((product: any) => {
       if (queryFilter) {
         const searchPool = [
           product.title,
@@ -114,35 +142,22 @@ export default function ProductGrid() {
           .join(' ')
           .toLowerCase();
 
-        // مطابقة الكلمة المطلوبة أو أجزاء منها
         if (!searchPool.includes(queryFilter)) {
           return false;
         }
       }
 
-      // 2. التصفية حسب القسم الرئيسي
       if (categoryFilter) {
         const prodCat = (product.category || '').toLowerCase().trim();
         const targetCat = categoryFilter.toLowerCase().trim();
-
-        const isCategoryMatch =
-          prodCat === targetCat ||
-          prodCat.includes(targetCat) ||
-          targetCat.includes(prodCat);
-
-        if (!isCategoryMatch) return false;
+        if (!prodCat.includes(targetCat) && !targetCat.includes(prodCat)) return false;
       }
 
-      // 3. التصفية حسب القسم الفرعي
       if (subCategoryFilter) {
         const productSub = product.subCategory || product.subcategory || product.sub;
-        if (!productSub) return false;
-
-        const isSubMatch = productSub.toString().trim().toLowerCase() === subCategoryFilter.trim().toLowerCase();
-        if (!isSubMatch) return false;
+        if (!productSub || productSub.toString().trim().toLowerCase() !== subCategoryFilter.trim().toLowerCase()) return false;
       }
 
-      // 4. التصفية حسب السعر والمتاجر
       const productPrice = Number(product.price || 0);
       if (minPriceFilter && productPrice < Number(minPriceFilter)) return false;
       if (maxPriceFilter && productPrice > Number(maxPriceFilter)) return false;
@@ -150,20 +165,12 @@ export default function ProductGrid() {
 
       return true;
     }).sort((a: any, b: any) => {
-      // منطق الترتيب: VIP -> ذهبي -> فضي -> أحدث
       const priorityA = getProductPriority(a);
       const priorityB = getProductPriority(b);
-
-      if (priorityA !== priorityB) {
-        return priorityB - priorityA;
-      }
-
-      const timeA = getCreatedAtTime(a);
-      const timeB = getCreatedAtTime(b);
-
-      return timeB - timeA;
+      if (priorityA !== priorityB) return priorityB - priorityA;
+      return getCreatedAtTime(b) - getCreatedAtTime(a);
     });
-  }, [localProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
+  }, [allProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
 
   return (
     <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
@@ -175,9 +182,14 @@ export default function ProductGrid() {
         </div>
       )}
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
+      {(loading || agentLoading) ? (
+        <div className="flex flex-col justify-center items-center py-20 gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+          {agentLoading && (
+            <p className="text-sm text-gray-500 font-medium animate-pulse">
+              جاري البحث عبر الـ AI Agent...
+            </p>
+          )}
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-16">
