@@ -5,8 +5,6 @@ import { collection, query, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { useStores } from '../hooks/useStores';
-import { universalSearch, StoreApiConfig } from '../services/storeSearch';
 import { fetchImages } from '../services/imageService';
 
 // 1. دالة التحقق مما إذا كان اشتراك الـ VIP سارياً
@@ -48,28 +46,24 @@ const getProductPriority = (product: any): number => {
 export default function ProductGrid() {
   const [localProducts, setLocalProducts] = useState<Product[]>([]);
   const [image, setImage] = useState<any[]>([]);
-  const [displayProducts, setDisplayProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [localFetched, setLocalFetched] = useState(false);
   const [visibleCount, setVisibleCount] = useState(12);
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
-  const { stores } = useStores();
 
-  // جلب الفلاتر من الـ URL فقط لمنع الاستدعاء الحثيث مع كل حرف
+  // جلب الفلاتر وكلمة البحث من الـ URL فقط
   const categoryFilter = searchParams.get('category');
   const subCategoryFilter = searchParams.get('sub');
   const minPriceFilter = searchParams.get('minPrice');
   const maxPriceFilter = searchParams.get('maxPrice');
   const storeFilters = searchParams.getAll('store');
-  
-  // الاعتماد المباشر على قيمة q الممررة عبر الرابط بعد الضغط على زر البحث
-  const queryFilter = searchParams.get('q') || '';
+  const queryFilter = (searchParams.get('q') || '').trim().toLowerCase();
 
   useEffect(() => {
     setVisibleCount(12);
-  }, [displayProducts]);
+  }, [queryFilter, categoryFilter, subCategoryFilter]);
 
+  // جلب المنتجات والصور من قاعدة البيانات المحلية
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -94,63 +88,30 @@ export default function ProductGrid() {
       } catch (error: any) {
         handleFirestoreError(error, OperationType.LIST, 'products');
       } finally {
-        setLocalFetched(true);
         setLoading(false);
       }
     };
     fetchData();
   }, []);
 
-  useEffect(() => {
-    const runSearch = async () => {
-      setLoading(true);
-
-      // فلترة المتاجر وتجهيز الكائنات بـ apiUrl و apiKey للمتاجر الخارجية
-      const activeStoresRaw = storeFilters.length > 0
-        ? stores.filter(s => storeFilters.includes(s.id) || storeFilters.includes(s.name))
-        : stores;
-
-      const storesToSearch: StoreApiConfig[] = activeStoresRaw.map((s: any) => ({
-        id: s.id || s.name?.toLowerCase(),
-        name: s.name,
-        apiUrl: s.apiUrl || (s.name?.toLowerCase().includes('amazon') 
-          ? 'https://real-time-amazon-data.p.rapidapi.com/search' 
-          : s.name?.toLowerCase().includes('ebay') 
-          ? 'https://real-time-ebay-data.p.rapidapi.com/search' 
-          : s.apiUrl),
-        apiKey: s.apiKey || import.meta.env.VITE_RAPIDAPI_KEY || '',
-        type: s.type || 'external'
-      }));
-
-      try {
-        // تنفيذ البحث الشامل فقط إذا كانت القيمة المرسلة عبر الـ URL غير فارغة
-        const results = await universalSearch(queryFilter.trim(), storesToSearch, localProducts);
-        setDisplayProducts(results);
-      } catch (err) {
-        console.error("Error executing universal search:", err);
-        setDisplayProducts(localProducts);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (localFetched) {
-      runSearch();
-    }
-  }, [queryFilter, localProducts, stores, localFetched, storeFilters.join(",")]);
-
+  // فلترة المنتجات محلياً بناءً على الاستعلام والأقسام
   const filteredProducts = useMemo(() => {
-    const filtered = displayProducts.filter((product: any) => {
-      const isExternalProduct = Boolean(product.externalUrl || product.source);
+    const filtered = localProducts.filter((product: any) => {
+      // 1. فلترة نص البحث (Search Query)
+      if (queryFilter) {
+        const title = (product.title || product.name || '').toLowerCase();
+        const description = (product.description || '').toLowerCase();
+        const category = (product.category || '').toLowerCase();
+        
+        const matchesQuery = 
+          title.includes(queryFilter) || 
+          description.includes(queryFilter) || 
+          category.includes(queryFilter);
 
-      // إذا كان المنتج خارجياً، نقوم بتقديمه دائماً عند وجود كلمة بحث ويتجاوز فلاتر الأقسام الصارمة
-      if (isExternalProduct && queryFilter) {
-        if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
-        if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
-        return true;
+        if (!matchesQuery) return false;
       }
 
-      // 1. التصفية حسب القسم الرئيسي
+      // 2. التصفية حسب القسم الرئيسي
       if (categoryFilter) {
         const prodCat = (product.category || '').toLowerCase().trim();
         const targetCat = categoryFilter.toLowerCase().trim();
@@ -163,7 +124,7 @@ export default function ProductGrid() {
         if (!isCategoryMatch) return false;
       }
 
-      // 2. التصفية حسب القسم الفرعي
+      // 3. التصفية حسب القسم الفرعي
       if (subCategoryFilter) {
         const productSub = product.subCategory || product.subcategory || product.sub;
         if (!productSub) return false;
@@ -172,7 +133,7 @@ export default function ProductGrid() {
         if (!isSubMatch) return false;
       }
 
-      // 3. التصفية حسب السعر والمتاجر
+      // 4. التصفية حسب السعر والمتاجر
       if (minPriceFilter && product.price < Number(minPriceFilter)) return false;
       if (maxPriceFilter && product.price > Number(maxPriceFilter)) return false;
       if (storeFilters.length > 0 && !storeFilters.includes(product.storeId) && !storeFilters.includes(product.storeName)) return false;
@@ -194,7 +155,7 @@ export default function ProductGrid() {
 
       return timeB - timeA;
     });
-  }, [displayProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
+  }, [localProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
 
   return (
     <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
