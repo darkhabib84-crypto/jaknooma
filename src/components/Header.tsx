@@ -16,12 +16,15 @@ export default function Header() {
   const location = useLocation();
   const { t, i18n } = useTranslation();
   const [isLangMenuOpen, setLangMenuOpen] = useState(false);
+  const { cart } = useCart();
 
+  // تنفيذ عملية البحث عند النقر على الزر أو الضغط على Enter
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-       navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
-       setMobileMenuOpen(false);
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/?q=${encodeURIComponent(query)}`);
+      setMobileMenuOpen(false);
     }
   };
 
@@ -40,7 +43,8 @@ export default function Header() {
     { code: 'hi', name: 'Hindi' },
     { code: 'ur', name: 'Urdu' },
   ];
-const { cart } = useCart();
+
+  const isRtl = ['ar', 'ur'].includes(i18n.language);
 
   return (
     <header dir="ltr" className="sticky top-0 z-[60] w-full border-b border-gray-100 bg-white/80 backdrop-blur-md shrink-0">
@@ -61,20 +65,27 @@ const { cart } = useCart();
         
         <Logo onClick={() => setMobileMenuOpen(false)} />
 
+        {/* Desktop Search Bar with Dedicated Search Button */}
         <div className="flex-1 max-w-2xl px-4 md:px-8 hidden md:block">
-          {/* Header search can be hidden behind an expandable toggle, but for now we'll just style it more refined */}
-          <form onSubmit={handleSearch} className="relative group w-full max-w-md ml-auto">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none opacity-40 group-focus-within:text-[#D4AF37] group-focus-within:opacity-100 transition-all">
-              <Search className="h-4 w-4" />
+          <form onSubmit={handleSearch} className="flex items-center gap-2 w-full max-w-lg ml-auto">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                dir={isRtl ? 'rtl' : 'ltr'}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50/50 focus:bg-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all text-left rtl:text-right"
+                placeholder={t('Search premium products...')}
+              />
             </div>
-            <input
-              type="text"
-              dir={['ar', 'ur'].includes(i18n.language) ? 'rtl' : 'ltr'}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="block w-full rounded-full border border-gray-200 py-2 pl-10 pr-4 text-sm text-black placeholder-gray-400 bg-transparent focus:bg-gray-50 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all text-left rtl:text-right"
-              placeholder={t('Search premium products...')}
-            />
+            <button
+              type="submit"
+              disabled={!searchQuery.trim()}
+              className="flex items-center justify-center gap-1.5 px-5 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 shadow-sm"
+            >
+              <Search className="h-4 w-4" />
+              <span>{t('Search')}</span>
+            </button>
           </form>
         </div>
 
@@ -102,12 +113,13 @@ const { cart } = useCart();
             )}
           </div>
           
-<a 
-  href="mailto:jaknooma@gmail.com" 
-  className="text-sm font-medium text-gray-600 hover:text-black transition-colors hidden lg:block"
->
-  {t('Support')}
-</a>          
+          <a 
+            href="mailto:jaknooma@gmail.com" 
+            className="text-sm font-medium text-gray-600 hover:text-black transition-colors hidden lg:block"
+          >
+            {t('Support')}
+          </a>          
+          
           {user ? (
             <div className="flex items-center gap-3 md:gap-4">
               {isAdmin && (
@@ -171,38 +183,43 @@ const { cart } = useCart();
             </div>
           )}
 
-<button
-  onClick={() => setCartOpen(true)}
-  className="relative p-2 text-[#D4AF37] hover:text-black transition-colors shrink-0"
-  aria-label="Open cart"
->
-  <ShoppingBag className="w-5 h-5" />
-  {cart.length > 0 && (
-    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#D4AF37] text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-      {cart.length}
-    </span>
-  )}
-</button>
-
-
+          <button
+            onClick={() => setCartOpen(true)}
+            className="relative p-2 text-[#D4AF37] hover:text-black transition-colors shrink-0"
+            aria-label="Open cart"
+          >
+            <ShoppingBag className="w-5 h-5" />
+            {cart.length > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#D4AF37] text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
+                {cart.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
       
-      {/* Mobile Search Bar - Only visible on small screens and when menu is NOT open (or we can just put it below header) */}
+      {/* Mobile Search Bar with Dedicated Search Button */}
       <div className="md:hidden px-4 pb-3 border-t border-gray-100 pt-3">
-         <form onSubmit={handleSearch} className="relative group w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none opacity-40">
-              <Search className="h-4 w-4 text-black" />
-            </div>
+        <form onSubmit={handleSearch} className="flex items-center gap-2 w-full">
+          <div className="relative flex-1">
             <input
               type="text"
-              dir={['ar', 'ur'].includes(i18n.language) ? 'rtl' : 'ltr'}
+              dir={isRtl ? 'rtl' : 'ltr'}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="block w-full rounded-full border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-black placeholder-gray-400 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-stone-300 transition-all"
+              className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-stone-300 transition-all text-left rtl:text-right"
               placeholder={t('Search products...')}
             />
-          </form>
+          </div>
+          <button
+            type="submit"
+            disabled={!searchQuery.trim()}
+            className="flex items-center justify-center p-2.5 bg-black text-white rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
+            aria-label={t('Search')}
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        </form>
       </div>
 
       <StoreFilter />
