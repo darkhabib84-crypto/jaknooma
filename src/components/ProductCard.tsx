@@ -40,7 +40,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
-  // معالجة الصور سواء كانت مصفوفة images أو رابط فردي image
   const imageList: string[] = Array.isArray(product.images) && product.images.length > 0 
     ? product.images 
     : (product.image ? [product.image] : []);
@@ -59,13 +58,9 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  // محتوى البطاقة الداخلي الموحد
   const CardContent = () => (
     <>
-      {/* Images Container */}
       <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
-        
-        {/* VIP / Discount Badges (للمنتجات المحلية) */}
         {!isExternal && (
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
             {product.isVIP && (
@@ -74,11 +69,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 alt="VIP" 
                 className="w-10 h-auto" 
                 onError={(e) => {
-                  if (e.currentTarget.getAttribute('src') === '/images/jaknooma-vip.png') {
-                    e.currentTarget.src = '/jaknooma-vip.png';
-                  } else if (e.currentTarget.getAttribute('src') === '/jaknooma-vip.png') {
-                    e.currentTarget.src = 'https://i.ibb.co/6R0gGf9/jaknooma-vip.png';
-                  }
+                  e.currentTarget.src = 'https://i.ibb.co/6R0gGf9/jaknooma-vip.png';
                 }}
               />
             )}
@@ -91,15 +82,13 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
-        {/* Store Badge (للمنتجات الخارجية) */}
         {isExternal && (
           <span className="absolute top-3 right-3 z-30 px-3 py-1 bg-black text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
             {product.storeName || 'خارجي'}
           </span>
         )}
 
-        {/* Images Slider / Single Image */}
-        {imageList.length > 0 ? (
+        {imageList.length > 0 && imageList[0] ? (
           <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
             {imageList.map((imgUrl, index) => (
               <img
@@ -112,15 +101,13 @@ export default function ProductCard({ product }: ProductCardProps) {
             ))}
           </div>
         ) : (
-          <div className="text-gray-400 text-xs">No image available</div>
+          <div className="text-gray-400 text-xs">لا توجد صورة</div>
         )}
       </div>
 
-      {/* Product Information */}
       <div className="flex flex-col px-2 mb-2">
         <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 min-h-[40px] mb-1">{productName}</h3>
         
-        {/* Price */}
         <div className="flex items-center gap-2 mt-1">
           {discount > 0 ? (
             <>
@@ -138,9 +125,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        {/* Details Section */}
         <div className="mt-3 pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-[11px] text-gray-500">
-          {/* Seller / Store Name */}
           <div className="flex items-center gap-1.5">
             <User size={12} className="text-gray-400 shrink-0" />
             <span className="truncate">
@@ -151,7 +136,6 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          {/* Location */}
           <div className="flex items-center gap-1.5">
             <MapPin size={12} className="text-gray-400 shrink-0" />
             <span className="truncate">
@@ -159,10 +143,9 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          {/* Date / Action Button */}
           {isExternal ? (
             <div className="flex items-center justify-between pt-1 text-black font-semibold text-xs group-hover:underline">
-              <span>شراء الآن</span>
+              <span>شراء الآن من {product.storeName}</span>
               <ExternalLink size={13} />
             </div>
           ) : (
