@@ -1,28 +1,129 @@
 // src/services/agentService.ts
 
-export async function searchWithAgent(query: string) {
+export interface ExternalProductResult {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  externalUrl: string;
+  storeName: string;
+  isExternal: boolean;
+}
+
+export async function searchWithAgent(query: string): Promise<ExternalProductResult[]> {
   if (!query || query.trim().length === 0) return [];
 
-  try {
-    // لاحظ أن المسار هنا يطابق اسم ملف الـ API لديك: /api/search-agent
-    const response = await fetch(`/api/search-agent?q=${encodeURIComponent(query)}`);
+  const cleanQuery = query.trim();
 
+  try {
+    // تشغيل الـ Scraping للخدمات بالتوازي من المتصفح
+    const results = await Promise.allSettled([
+      scrapeAmazonWeb(cleanQuery),
+      scrapeEbayWeb(cleanQuery)
+    ]);
+
+    const allProducts: ExternalProductResult[] = results
+      .filter((r): r is PromiseFulfilledResult<ExternalProductResult[]> => r.status === 'fulfilled')
+      .flatMap(r => r.value);
+
+    return allProducts;
+  } catch (error) {
+    console.error('Failed to search via AI Agent:', error);
+    return [];
+  }
+}
+
+// 1. جلب منتجات أمازون عبر CORS Proxy
+async function scrapeAmazonWeb(query: string): Promise<ExternalProductResult[]> {
+  try {
+    const targetUrl = `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=jaknooma-20`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+    const response = await fetch(proxyUrl);
     if (!response.ok) return [];
 
     const data = await response.json();
+    const html = data.contents;
+    if (!html) return [];
+
+    const products: ExternalProductResult[] = [];
     
-    // تحويل البيانات لتناسب واجهة ProductCard في موقعك
-    return (data.products || []).map((item: any) => ({
-      id: item.id,
-      title: item.name,
-      price: item.price,
-      image: item.image,
-      externalUrl: item.externalUrl,
-      storeName: item.storeName,
-      isExternal: true
-    }));
-  } catch (error) {
-    console.error('Failed to search via AI Agent:', error);
+    // استخراج أسماء وأسعار وصور المنتجات باستخدام RegEx خفيف
+    const itemRegex = /data-asin="([A-Z0-9]{10})".*?class="a-size-[^"]*a-color-base a-text-normal">(.*?)<\/span>.*?class="a-price-whole">(.*?)<\/span>/gs;
+    
+    let match;
+    let count = 0;
+    while ((match = itemRegex.exec(html)) !== null && count < 6) {
+      const asin = match[1];
+      const title = match[2].replace(/<[^>]+>/g, '').trim();
+      const rawPrice = match[3].replace(/[^\d.]/g, '');
+      const price = parseFloat(rawPrice) || 0;
+
+      const imgRegex = new RegExp(`data-asin="${asin}".*?src="(https://m.media-amazon.com/images/I/[^"]+)"`, 's');
+      const imgMatch = imgRegex.exec(html);
+      const image = imgMatch ? imgMatch[1] : 'https://via.placeholder.com/150';
+
+      if (asin && title && price > 0) {
+        products.push({
+          id: `amz-${asin}`,
+          title: title,
+          price: price,
+          image: image,
+          externalUrl: `https://www.amazon.com/dp/${asin}?tag=jaknooma-20`,
+          storeName: 'Amazon',
+          isExternal: true
+        });
+        count++;
+      }
+    }
+
+    return products;
+  } catch (e) {
+    console.error('Amazon scrape error:', e);
+    return [];
+  }
+}
+
+// 2. جلب منتجات إيباي عبر CORS Proxy
+async function scrapeEbayWeb(query: string): Promise<ExternalProductResult[]> {
+  try {
+    const targetUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&_sacat=0`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+    const response = await fetch(proxyUrl);
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const html = data.contents;
+    if (!html) return [];
+
+    const products: ExternalProductResult[] = [];
+    const itemRegex = /<div class="s-item__info clearfix">.*?<span role="heading"[^>]*>(.*?)<\/span>.*?<span class="s-item__price">(.*?)<\/span>/gs;
+
+    let match;
+    let count = 0;
+    while ((match = itemRegex.exec(html)) !== null && count < 6) {
+      const title = match[1].replace(/<[^>]+>/g, '').trim();
+      const rawPrice = match[2].replace(/[^\d.]/g, '');
+      const price = parseFloat(rawPrice) || 0;
+
+      if (title && !title.toLowerCase().includes('shop on ebay') && price > 0) {
+        products.push({
+          id: `ebay-${Date.now()}-${count}`,
+          title: title,
+          price: price,
+          image: 'https://via.placeholder.com/150',
+          externalUrl: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(title)}&campid=533000000`,
+          storeName: 'eBay',
+          isExternal: true
+        });
+        count++;
+      }
+    }
+
+    return products;
+  } catch (e) {
+    console.error('eBay scrape error:', e);
     return [];
   }
 }
