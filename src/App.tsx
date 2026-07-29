@@ -98,7 +98,7 @@ function AppContent() {
           
           <Route path="/product/:id" element={<ProductDetails />} />
           
-          {/* مسارات صفحة البائع والمتجر الجديدة */}
+          {/* مسارات صفحة البائع ومتجر الخارجية */}
           <Route path="/store/:sellerId" element={<SellerProfile />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
 
