@@ -49,11 +49,11 @@ export const LEGAL_EXTERNAL_STORES: LegalStoreConfig[] = [
   }
 ];
 
-// رابط الـ Agent الخاص بك أو endpoint الخادم
 const SEARCH_AGENT_URL = '/api/search-agent';
+const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE';
 
-// مفتاح RapidAPI الخاص بك (إذا كنت تدعو RapidAPI مباشرة من الواجهة)
-const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE'; 
+// ذاكرة مؤقتة لمنع تكرار الطلبات ونفاذ الرصيد
+const searchCache = new Map<string, Product[]>();
 
 const parseSafePrice = (priceVal: any): number => {
   if (!priceVal) return 0;
@@ -78,7 +78,6 @@ const parseSafeImage = (item: any): string => {
   return '';
 };
 
-// 1. طلب متجر موجه لـ RapidAPI بمعالجة آمنة للاستجابة
 const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
   if (!store.apiUrl) return [];
 
@@ -90,7 +89,6 @@ const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Pr
       'Accept': 'application/json'
     };
 
-    // إذا كان الرابط يخص RapidAPI نمرر الهيدرز المطلوبة لمنع خطأ 401
     if (store.apiUrl.includes('rapidapi.com')) {
       headers['x-rapidapi-key'] = store.apiKey || RAPID_API_KEY;
       headers['x-rapidapi-host'] = url.hostname;
@@ -99,9 +97,8 @@ const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Pr
     }
 
     const response = await fetch(url.toString(), { headers });
-
-    // التحقق من أن الاستجابة ناجحة ومن نوع JSON لمنع خطأ SyntaxError
     const contentType = response.headers.get('content-type');
+
     if (response.ok && contentType && contentType.includes('application/json')) {
       const data = await response.json();
       const results = Array.isArray(data) ? data : (data.items || data.products || data.results || data.data || []);
@@ -124,22 +121,25 @@ const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Pr
         isVIP: false,
         createdAt: new Date().toISOString()
       } as Product));
-    } else {
-      console.warn(`[Jaknooma API Skip] ${store.name} responded with status ${response.status}`);
-      return [];
     }
+
+    if (response.status === 429) {
+      console.warn(`[Jaknooma Rate Limit] ${store.name} 429 - تم تجاوز حد الطلبات`);
+    } else if (response.status === 403) {
+      console.warn(`[Jaknooma Auth Error] ${store.name} 403 - المفتاح غير صالح أو انتهت الحصة`);
+    }
+
+    return [];
   } catch (error) {
-    console.error(`[Jaknooma API Error - ${store.name}]`, error);
     return [];
   }
 };
 
-// 2. جلب النتائج من الـ Agent مع حماية من الأخطاء
 const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
   try {
     const response = await fetch(`${SEARCH_AGENT_URL}?q=${encodeURIComponent(keyword)}`);
-    
     const contentType = response.headers.get('content-type');
+
     if (!response.ok || !contentType || !contentType.includes('application/json')) {
       return [];
     }
@@ -167,7 +167,6 @@ const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
       createdAt: new Date().toISOString()
     } as Product));
   } catch (error) {
-    console.error('[Jaknooma AI Agent Search Error]', error);
     return [];
   }
 };
@@ -179,7 +178,7 @@ export async function universalSearch(
 ): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
 
-  // تصفية المنتجات المحلية
+  // تصفية المنتجات المحلية أولاً
   const localResults = localProducts.filter(p => {
     if (!query) return true;
     const productName = (p.name || p.title || '').toLowerCase();
@@ -191,7 +190,13 @@ export async function universalSearch(
     return localResults;
   }
 
-  // البحث عبر APIs المتاجر الفعالة
+  // الاسترجاع من الـ Cache إذا أجريت نفس عملية البحث سابقاً
+  if (searchCache.has(query)) {
+    const cachedResults = searchCache.get(query) || [];
+    return [...localResults, ...cachedResults];
+  }
+
+  // البحث في المتاجر المربوطة
   const apiStores = activeStores.filter(s => s.apiUrl);
   let directApiResults: Product[] = [];
 
@@ -206,8 +211,15 @@ export async function universalSearch(
     }
   }
 
-  // جلب نتائج الـ AI Agent
+  // البحث عن طريق الـ Agent
   const agentResults = await fetchAgentResults(query);
 
-  return [...localResults, ...directApiResults, ...agentResults];
+  const combinedExternal = [...directApiResults, ...agentResults];
+
+  // حفظ نتائج البحث الخارجي في الذاكرة المؤقتة
+  if (combinedExternal.length > 0) {
+    searchCache.set(query, combinedExternal);
+  }
+
+  return [...localResults, ...combinedExternal];
 }
