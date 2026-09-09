@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, User, Calendar, ExternalLink, ImageOff } from 'lucide-react';
 
@@ -82,16 +82,14 @@ export default function ProductCard({ product }: ProductCardProps) {
                 src="/images/jaknooma-vip.png" 
                 alt="VIP" 
                 className="w-10 h-auto" 
-                onError={(e) => {
-                  e.currentTarget.src = 'https://i.ibb.co/6R0gGf9/jaknooma-vip.png';
-                }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             )}
             {discount >= 10 && (
-              <img src="/images/jaknooma-10.png" alt="Gold" className="w-10 h-auto" />
+              <img src="/images/jaknooma-10.png" alt="Gold" className="w-10 h-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             )}
             {discount > 0 && discount < 10 && (
-              <img src="/images/jaknooma-5.png" alt="Silver" className="w-10 h-auto" />
+              <img src="/images/jaknooma-5.png" alt="Silver" className="w-10 h-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             )}
           </div>
         )}
@@ -103,32 +101,14 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {imageList.length > 0 ? (
-          <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+          <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide items-center justify-center">
             {imageList.map((imgUrl, index) => (
-              <img
-                key={index}
-                src={imgUrl}
-                alt={`${productName} - ${index + 1}`}
-                className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
-                onError={(e) => { 
-                  // منع تكرار الخطأ واستبدال العنصر بواجهة أيقونة بديلة محلياً دون طلب خارجي فاشل
-                  const target = e.currentTarget as HTMLImageElement;
-                  target.onerror = null; 
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent && !parent.querySelector('.fallback-icon')) {
-                    const fallbackDiv = document.createElement('div');
-                    fallbackDiv.className = 'fallback-icon flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1';
-                    fallbackDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"></line><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"></path><line x1="13.5" y1="6" x2="21" y2="6"></line><line x1="17" y1="2" x2="17" y2="10"></line><path d="M21 21H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2"></path><polyline points="9 18 15 12 21 18"></polyline></svg><span class="text-[10px]">تعذر تحميل الصورة</span>`;
-                    parent.appendChild(fallbackDiv);
-                  }
-                }}
-              />
+              <SafeImage key={index} src={imgUrl} alt={`${productName} - ${index + 1}`} />
             ))}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
-            <ImageOff size={20} />
+            <ImageOff size={24} />
             <span>لا توجد صورة متاحة</span>
           </div>
         )}
@@ -149,7 +129,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </>
           ) : (
             <span className="text-sm font-semibold text-gray-900">
-              {finalPrice > 0 ? `${finalPrice.toFixed(2)} {currencySymbol}` : 'شاهد السعر بالمتجر'}
+              {finalPrice > 0 ? `${finalPrice.toFixed(2)} ${currencySymbol}` : 'شاهد السعر بالمتجر'}
             </span>
           )}
         </div>
@@ -207,5 +187,28 @@ export default function ProductCard({ product }: ProductCardProps) {
         </Link>
       )}
     </div>
+  );
+}
+
+// مكون فرعي آمن للصور يمنع الانهيار وحلقات الأخطاء بشكل كامل
+function SafeImage({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-100 rounded-2xl">
+        <ImageOff size={24} />
+        <span className="text-[10px]">تعذر التحميل (شهادة غير صالحة)</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
+      onError={() => setHasError(true)}
+    />
   );
 }
