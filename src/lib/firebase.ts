@@ -1,8 +1,8 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAnalytics } from 'firebase/analytics'; // 1. استيراد Analytics
+import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSFDoE6Fuyv3eKR6GrKxISXOIE9Om48LQ",
@@ -11,19 +11,26 @@ const firebaseConfig = {
   storageBucket: "jaknooma.firebasestorage.app",
   messagingSenderId: "215148796185",
   appId: "1:215148796185:web:ccd43a8a17896d02eb4d88",
-  measurementId: "G-GGBN015JJZ" // معرف القياس جاهز وموجود بالفعل لديك ✓
+  measurementId: "G-GGBN015JJZ"
 };
 
 // التهيئة الأساسية
 const app = initializeApp(firebaseConfig);
+
 export const auth = getAuth(app);
+
+// ضمان حفظ الجلسة محلياً في المتصفح لتفادي مشاكل التحقق
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
+}
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// 2. تهيئة وتصدير Analytics للعمل في البيئات التي تدعم المتصفح
+// تهيئة Analytics للعمل في بيئة المتصفح
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-// قمنا بفصل الـ Enum ليكون تصديراً نظيفاً
+// تصدير Enum للعمليات
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -33,7 +40,7 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-// تعديل الواجهة لتكون آمنة
+// واجهة تفاصيل أخطاء Firestore
 interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
@@ -53,7 +60,6 @@ interface FirestoreErrorInfo {
 
 // دالة معالجة الأخطاء الآمنة
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  // نقوم بجلب المستخدم الحالي "هنا" فقط عند حدوث الخطأ
   const user = auth.currentUser; 
   
   const errInfo: FirestoreErrorInfo = {
