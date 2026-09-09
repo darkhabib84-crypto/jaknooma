@@ -11,6 +11,9 @@ export interface Product {
   currency?: string;
   images?: string[];
   image?: string;
+  imageUrl?: string;
+  img?: string;
+  photo?: string;
   isVIP?: boolean;
   externalUrl?: string;
   affiliateLink?: string;
@@ -40,10 +43,21 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
-  // معالجة استخراج الصور لدعم الإعلانات القديمة والجديدة معاً
-  const imageList: string[] = Array.isArray(product.images) && product.images.length > 0 
-    ? product.images 
-    : (product.image ? [product.image] : []);
+  // معالجة ذكية شاملة لاستخراج الصور تدعم كافة أشكال التخزين القديمة والجديدة
+  const imageList: string[] = (() => {
+    if (Array.isArray(product.images) && product.images.length > 0) {
+      const validImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
+      if (validImages.length > 0) return validImages;
+    }
+    
+    // دعم جميع التسميات المحتملة للحقول المفردة القديمة في قاعدة البيانات
+    const singleImage = product.image || product.imageUrl || product.img || product.photo;
+    if (typeof singleImage === 'string' && singleImage.trim() !== '') {
+      return [singleImage];
+    }
+    
+    return [];
+  })();
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Just now';
@@ -89,7 +103,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </span>
         )}
 
-        {imageList.length > 0 && imageList[0] ? (
+        {imageList.length > 0 ? (
           <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
             {imageList.map((imgUrl, index) => (
               <img
@@ -98,14 +112,14 @@ export default function ProductCard({ product }: ProductCardProps) {
                 alt={`${productName} - ${index + 1}`}
                 className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
                 onError={(e) => { 
-                  // في حال فشل تحميل الصورة القديمة يتم اخفاؤها أو وضع صورة بديلة
-                  (e.currentTarget as HTMLImageElement).style.display = 'none'; 
+                  // في حال فشل الرابط نهائياً، عرض صورة بديلة رمادية افتراضية لتفادي الفراغ الكلي
+                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
                 }}
               />
             ))}
           </div>
         ) : (
-          <div className="text-gray-400 text-xs">لا توجد صورة</div>
+          <div className="text-gray-400 text-xs text-center px-2">لا توجد صورة متاحة لهذا الإعلان</div>
         )}
       </div>
 
