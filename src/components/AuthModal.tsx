@@ -32,13 +32,6 @@ export default function AuthModal() {
   
   const [mode, setMode] = useState<AuthMode>(authModalMode as AuthMode);
 
-  // مزامنة حالة النمط عند فتح النافذة
-  useEffect(() => {
-    if (isAuthModalOpen) {
-      setMode(authModalMode as AuthMode);
-    }
-  }, [isAuthModalOpen, authModalMode]);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -49,13 +42,41 @@ export default function AuthModal() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // دالة مساعدة لإعادة ضبط جميع الحالات والرسائل عند تغيير النمط
+  const resetFormState = () => {
+    setError('');
+    setMessage('');
+    setEmail('');
+    setPassword('');
+    setPhone('');
+    setVerificationCode('');
+    setConfirmationResult(null);
+  };
+
+  const handleModeChange = (newMode: AuthMode) => {
+    resetFormState();
+    setMode(newMode);
+  };
+
+  // مزامنة حالة النمط عند فتح النافذة
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      setMode(authModalMode as AuthMode);
+      resetFormState();
+    }
+  }, [isAuthModalOpen, authModalMode]);
+
   // إدارة reCAPTCHA عند اختيار الهاتف
   useEffect(() => {
     if (isAuthModalOpen && mode === 'phone') {
       if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-          size: 'invisible',
-        });
+        try {
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible',
+          });
+        } catch (e) {
+          console.error("Error initializing Recaptcha", e);
+        }
       }
     } else {
       if (window.recaptchaVerifier) {
@@ -71,6 +92,16 @@ export default function AuthModal() {
 
   if (!isAuthModalOpen) return null;
 
+  // دالة موحدة لإنشاء أو تحديث ملف المستخدم في Firestore
+  const saveUserProfile = async (uid: string, additionalData: Record<string, any>) => {
+    await setDoc(doc(db, "users", uid), {
+      role: "customer",
+      status: "Active",
+      createdAt: serverTimestamp(),
+      ...additionalData
+    }, { merge: true });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -81,14 +112,10 @@ export default function AuthModal() {
       if (mode === 'signup') {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
-        // إنشاء سجل المستخدم في Firestore
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        await saveUserProfile(userCredential.user.uid, {
           email: email,
           name: email.split('@')[0],
-          role: "customer",
-          status: "Active",
-          createdAt: serverTimestamp()
-        }, { merge: true });
+        });
         
         closeAuthModal();
       } else if (mode === 'login') {
@@ -114,32 +141,32 @@ export default function AuthModal() {
           const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
           const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
           setConfirmationResult(result);
-          setMessage('OTP sent to your phone. Please enter it below.');
+          setMessage(t('OTP sent to your phone. Please enter it below.'));
         } else {
           const userCredential = await confirmationResult.confirm(verificationCode);
           
-          await setDoc(doc(db, "users", userCredential.user.uid), {
+          await saveUserProfile(userCredential.user.uid, {
             phone: phone,
-            role: "customer",
-            status: "Active",
-            createdAt: serverTimestamp()
-          }, { merge: true });
+          });
 
           closeAuthModal();
         }
       }
     } catch (err: any) {
       if (err.code === 'auth/operation-not-allowed') {
-        setError('This sign-in method is not enabled. Please enable it in the Firebase Console under Authentication > Sign-in method.');
+        setError(t('This sign-in method is not enabled. Please enable it in the Firebase Console under Authentication > Sign-in method.'));
       } else {
-        setError(err.message || 'An error occurred during authentication');
+        setError(err.message || t('An error occurred during authentication'));
       }
 
       if (mode === 'phone' && !confirmationResult) {
         if (window.recaptchaVerifier && window.grecaptcha) {
-          window.recaptchaVerifier.render().then((widgetId: any) => {
+          try {
+            const widgetId = await window.recaptchaVerifier.render();
             window.grecaptcha.reset(widgetId);
-          });
+          } catch (e) {
+            console.error("Error resetting Recaptcha", e);
+          }
         }
       }
     } finally {
@@ -152,18 +179,15 @@ export default function AuthModal() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       
-      await setDoc(doc(db, "users", result.user.uid), {
+      await saveUserProfile(result.user.uid, {
         email: result.user.email,
         name: result.user.displayName || "Google User",
-        role: "customer",
-        status: "Active",
-        createdAt: serverTimestamp()
-      }, { merge: true });
+      });
 
       closeAuthModal();
     } catch (err: any) {
       console.error("Google Auth Error:", err);
-      setError(err.message);
+      setError(err.message || t('Failed to sign in with Google'));
     }
   };
 
@@ -220,7 +244,7 @@ export default function AuthModal() {
                   {mode === 'login' && (
                     <button 
                       type="button" 
-                      onClick={() => { setMode('forgot-password'); setError(''); setMessage(''); }}
+                      onClick={() => handleModeChange('forgot-password')}
                       className="text-xs text-gray-500 hover:text-black hover:underline"
                     >
                       {t('Forgot password?')}
@@ -364,21 +388,21 @@ export default function AuthModal() {
             <div className="flex bg-gray-50 p-1 rounded-xl">
               <button 
                 type="button"
-                onClick={() => { setMode('login'); setError(''); setMessage(''); setConfirmationResult(null); }}
+                onClick={() => handleModeChange('login')}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
               >
                 {t('Password')}
               </button>
               <button 
                 type="button"
-                onClick={() => { setMode('email-link'); setError(''); setMessage(''); setConfirmationResult(null); }}
+                onClick={() => handleModeChange('email-link')}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'email-link' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
               >
                 {t('Magic Link')}
               </button>
               <button 
                 type="button"
-                onClick={() => { setMode('phone'); setError(''); setMessage(''); setConfirmationResult(null); }}
+                onClick={() => handleModeChange('phone')}
                 className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'phone' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
               >
                 {t('Phone')}
@@ -387,13 +411,13 @@ export default function AuthModal() {
             
             {mode === 'login' ? (
               <p className="text-sm text-gray-500">
-                {t('Don\'t have an account?')} <button onClick={() => { setMode('signup'); setError(''); setMessage(''); setConfirmationResult(null); }} className="text-black font-bold hover:underline">
+                {t('Don\'t have an account?')} <button type="button" onClick={() => handleModeChange('signup')} className="text-black font-bold hover:underline">
                   {t('Sign up')}
                 </button>
               </p>
             ) : mode === 'signup' ? (
               <p className="text-sm text-gray-500">
-                {t('Already have an account?')} <button onClick={() => { setMode('login'); setError(''); setMessage(''); setConfirmationResult(null); }} className="text-black font-bold hover:underline">
+                {t('Already have an account?')} <button type="button" onClick={() => handleModeChange('login')} className="text-black font-bold hover:underline">
                   {t('Sign in')}
                 </button>
               </p>
