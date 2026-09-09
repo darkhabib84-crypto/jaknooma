@@ -43,19 +43,26 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
-  // استخراج الصور بأمان
+  // معالجة استخراج الصور وتنظيفها
   const imageList: string[] = (() => {
+    let rawImages: string[] = [];
     if (Array.isArray(product.images) && product.images.length > 0) {
-      const validImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
-      if (validImages.length > 0) return validImages;
+      rawImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
+    } else {
+      const singleImage = product.image || product.imageUrl || product.img || product.photo;
+      if (typeof singleImage === 'string' && singleImage.trim() !== '') {
+        rawImages = [singleImage];
+      }
     }
-    
-    const singleImage = product.image || product.imageUrl || product.img || product.photo;
-    if (typeof singleImage === 'string' && singleImage.trim() !== '') {
-      return [singleImage];
-    }
-    
-    return [];
+
+    // تمرير الروابط عبر بروكسي آمن (wsrv.nl) لتجاوز مشاكل شهادات SSL وحظر الـ GitHub/Codespaces
+    return rawImages.map(url => {
+      // إذا كان الرابط يبدأ بـ http أو https، نقوم بترميزه عبر الـ Proxy الآمن للصور
+      if (url.startsWith('http')) {
+        return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&fit=cover`;
+      }
+      return url;
+    });
   })();
 
   const formatDate = (timestamp: any) => {
@@ -190,15 +197,15 @@ export default function ProductCard({ product }: ProductCardProps) {
   );
 }
 
-// مكون فرعي آمن للصور يمنع الانهيار وحلقات الأخطاء بشكل كامل
+// مكون آمن للصور يعالج الأخطاء بشكل صامت ويتحول لشكل بديل
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-100 rounded-2xl">
-        <ImageOff size={24} />
-        <span className="text-[10px]">تعذر التحميل (شهادة غير صالحة)</span>
+      <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50 rounded-2xl">
+        <ImageOff size={22} />
+        <span className="text-[10px]">الصورة غير متوفرة</span>
       </div>
     );
   }
