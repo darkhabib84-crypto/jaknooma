@@ -91,7 +91,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const CardContent = () => (
     <>
-      <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
+      <div className="relative w-full pt-[125%] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden">
         {!isExternal && (
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
             {product.isVIP && (
@@ -128,13 +128,15 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {imageList.length > 0 ? (
-          <div className="flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide items-center justify-center">
+          <div className="absolute inset-0 flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
             {imageList.map((imgUrl, index) => (
-              <SafeImage key={index} src={imgUrl} alt={`${productName} - ${index + 1}`} />
+              <div key={index} className="w-full h-full flex-shrink-0 snap-center relative">
+                <SafeImage src={imgUrl} alt={`${productName} - ${index + 1}`} />
+              </div>
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
             <ImageOff size={24} />
             <span>لا توجد صورة متاحة</span>
           </div>
@@ -222,7 +224,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
 
   if (hasError) {
     return (
-      <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50 rounded-2xl">
+      <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50">
         <ImageOff size={22} />
         <span className="text-[10px]">الصورة غير متوفرة</span>
       </div>
@@ -233,7 +235,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
     <img
       src={src}
       alt={alt}
-      className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
       onError={() => setHasError(true)}
     />
   );
