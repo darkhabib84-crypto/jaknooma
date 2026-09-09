@@ -40,6 +40,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
+  // معالجة استخراج الصور لدعم الإعلانات القديمة والجديدة معاً
   const imageList: string[] = Array.isArray(product.images) && product.images.length > 0 
     ? product.images 
     : (product.image ? [product.image] : []);
@@ -96,7 +97,10 @@ export default function ProductCard({ product }: ProductCardProps) {
                 src={imgUrl}
                 alt={`${productName} - ${index + 1}`}
                 className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                onError={(e) => { 
+                  // في حال فشل تحميل الصورة القديمة يتم اخفاؤها أو وضع صورة بديلة
+                  (e.currentTarget as HTMLImageElement).style.display = 'none'; 
+                }}
               />
             ))}
           </div>
