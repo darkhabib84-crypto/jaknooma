@@ -43,17 +43,19 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
+  // استبدل جزء imageList بهذا مؤقتاً للاختبار
+  const imageList: string[] = ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&fit=cover'];
   // معالجة استخراج الصور وتنظيفها وتصحيح مساراتها المحلية أو الخارجية
-  const imageList: string[] = (() => {
-    let rawImages: string[] = [];
-    if (Array.isArray(product.images) && product.images.length > 0) {
-      rawImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
-    } else {
-      const singleImage = product.image || product.imageUrl || product.img || product.photo;
-      if (typeof singleImage === 'string' && singleImage.trim() !== '') {
-        rawImages = [singleImage];
-      }
-    }
+ // const imageList: string[] = (() => {
+ //   let rawImages: string[] = [];
+  //  if (Array.isArray(product.images) && product.images.length > 0) {
+ //     rawImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
+ //   } else {
+  //    const singleImage = product.image || product.imageUrl || product.img || product.photo;
+   //   if (typeof singleImage === 'string' && singleImage.trim() !== '') {
+   //     rawImages = [singleImage];
+   //   }
+  //  }
 
     return rawImages.map(url => {
       const cleanUrl = url.trim();
