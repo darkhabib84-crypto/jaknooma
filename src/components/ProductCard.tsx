@@ -43,7 +43,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
-  // معالجة استخراج الصور وتنظيفها
+  // معالجة استخراج الصور وتنظيفها وتصحيح مساراتها المحلية أو الخارجية
   const imageList: string[] = (() => {
     let rawImages: string[] = [];
     if (Array.isArray(product.images) && product.images.length > 0) {
@@ -55,13 +55,18 @@ export default function ProductCard({ product }: ProductCardProps) {
       }
     }
 
-    // تمرير الروابط عبر بروكسي آمن (wsrv.nl) لتجاوز مشاكل شهادات SSL وحظر الـ GitHub/Codespaces
     return rawImages.map(url => {
-      // إذا كان الرابط يبدأ بـ http أو https، نقوم بترميزه عبر الـ Proxy الآمن للصور
-      if (url.startsWith('http')) {
-        return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=400&fit=cover`;
+      const cleanUrl = url.trim();
+      // إذا كان الرابط خارجي، نمرره عبر البروكسي الآمن
+      if (cleanUrl.startsWith('http')) {
+        return `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}&w=400&fit=cover`;
       }
-      return url;
+      // إذا كان مساراً محلياً، نضمن توافقه مع مسار الاستضافة الأساسي
+      const base = import.meta.env.BASE_URL || '/';
+      if (cleanUrl.startsWith('/')) {
+        return `${base}${cleanUrl.slice(1)}`;
+      }
+      return `${base}${cleanUrl}`;
     });
   })();
 
@@ -79,6 +84,11 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   };
 
+  const resolveBadgePath = (path: string) => {
+    const base = import.meta.env.BASE_URL || '/';
+    return path.startsWith('/') ? `${base}${path.slice(1)}` : `${base}${path}`;
+  };
+
   const CardContent = () => (
     <>
       <div className="relative aspect-[4/5] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden flex items-center justify-center p-2">
@@ -86,17 +96,27 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
             {product.isVIP && (
               <img 
-                src="/images/jaknooma-vip.png" 
+                src={resolveBadgePath('images/jaknooma-vip.png')} 
                 alt="VIP" 
                 className="w-10 h-auto" 
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             )}
             {discount >= 10 && (
-              <img src="/images/jaknooma-10.png" alt="Gold" className="w-10 h-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <img 
+                src={resolveBadgePath('images/jaknooma-10.png')} 
+                alt="Gold" 
+                className="w-10 h-auto" 
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+              />
             )}
             {discount > 0 && discount < 10 && (
-              <img src="/images/jaknooma-5.png" alt="Silver" className="w-10 h-auto" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <img 
+                src={resolveBadgePath('images/jaknooma-5.png')} 
+                alt="Silver" 
+                className="w-10 h-auto" 
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+              />
             )}
           </div>
         )}
@@ -197,7 +217,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   );
 }
 
-// مكون آمن للصور يعالج الأخطاء بشكل صامت ويتحول لشكل بديل
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [hasError, setHasError] = useState(false);
 
