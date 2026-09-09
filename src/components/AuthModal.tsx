@@ -3,11 +3,7 @@ import { X } from 'lucide-react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  sendSignInLinkToEmail,
   sendPasswordResetEmail,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
-  ConfirmationResult,
   GoogleAuthProvider,
   signInWithPopup
 } from 'firebase/auth';
@@ -17,40 +13,27 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-declare global {
-  interface Window {
-    recaptchaVerifier: any;
-    grecaptcha: any;
-  }
-}
-
-type AuthMode = 'login' | 'signup' | 'email-link' | 'phone' | 'forgot-password';
+type AuthMode = 'login' | 'signup' | 'forgot-password';
 
 export default function AuthModal() {
   const { isAuthModalOpen, authModalMode, closeAuthModal } = useAuth();
   const { t } = useTranslation();
   
-  const [mode, setMode] = useState<AuthMode>(authModalMode as AuthMode);
+  const [mode, setMode] = useState<AuthMode>(
+    authModalMode === 'phone' || authModalMode === 'email-link' ? 'login' : (authModalMode as AuthMode)
+  );
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
-  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  // دالة مساعدة لإعادة ضبط جميع الحالات والرسائل عند تغيير النمط
   const resetFormState = () => {
     setError('');
     setMessage('');
     setEmail('');
     setPassword('');
-    setPhone('');
-    setVerificationCode('');
-    setConfirmationResult(null);
   };
 
   const handleModeChange = (newMode: AuthMode) => {
@@ -58,41 +41,15 @@ export default function AuthModal() {
     setMode(newMode);
   };
 
-  // مزامنة حالة النمط عند فتح النافذة
   useEffect(() => {
     if (isAuthModalOpen) {
-      setMode(authModalMode as AuthMode);
+      setMode(authModalMode === 'phone' || authModalMode === 'email-link' ? 'login' : (authModalMode as AuthMode));
       resetFormState();
     }
   }, [isAuthModalOpen, authModalMode]);
 
-  // إدارة reCAPTCHA عند اختيار الهاتف
-  useEffect(() => {
-    if (isAuthModalOpen && mode === 'phone') {
-      if (!window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible',
-          });
-        } catch (e) {
-          console.error("Error initializing Recaptcha", e);
-        }
-      }
-    } else {
-      if (window.recaptchaVerifier) {
-        try {
-          window.recaptchaVerifier.clear();
-        } catch (e) {
-          console.error("Error clearing Recaptcha", e);
-        }
-        window.recaptchaVerifier = null;
-      }
-    }
-  }, [isAuthModalOpen, mode]);
-
   if (!isAuthModalOpen) return null;
 
-  // دالة موحدة لإنشاء أو تحديث ملف المستخدم في Firestore
   const saveUserProfile = async (uid: string, additionalData: Record<string, any>) => {
     await setDoc(doc(db, "users", uid), {
       role: "customer",
@@ -121,54 +78,12 @@ export default function AuthModal() {
       } else if (mode === 'login') {
         await signInWithEmailAndPassword(auth, email, password);
         closeAuthModal();
-      } else if (mode === 'email-link') {
-        const actionCodeSettings = {
-          url: window.location.href,
-          handleCodeInApp: true,
-        };
-        await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-        window.localStorage.setItem('emailForSignIn', email);
-        setMessage(t('A sign-in link has been sent to your email address.'));
       } else if (mode === 'forgot-password') {
         await sendPasswordResetEmail(auth, email);
         setMessage(t('A password reset link has been sent to your email address.'));
-      } else if (mode === 'phone') {
-        if (!confirmationResult) {
-          if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
-          }
-          const appVerifier = window.recaptchaVerifier;
-          const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
-          const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-          setConfirmationResult(result);
-          setMessage(t('OTP sent to your phone. Please enter it below.'));
-        } else {
-          const userCredential = await confirmationResult.confirm(verificationCode);
-          
-          await saveUserProfile(userCredential.user.uid, {
-            phone: phone,
-          });
-
-          closeAuthModal();
-        }
       }
     } catch (err: any) {
-      if (err.code === 'auth/operation-not-allowed') {
-        setError(t('This sign-in method is not enabled. Please enable it in the Firebase Console under Authentication > Sign-in method.'));
-      } else {
-        setError(err.message || t('An error occurred during authentication'));
-      }
-
-      if (mode === 'phone' && !confirmationResult) {
-        if (window.recaptchaVerifier && window.grecaptcha) {
-          try {
-            const widgetId = await window.recaptchaVerifier.render();
-            window.grecaptcha.reset(widgetId);
-          } catch (e) {
-            console.error("Error resetting Recaptcha", e);
-          }
-        }
-      }
+      setError(err.message || t('An error occurred during authentication'));
     } finally {
       setLoading(false);
     }
@@ -196,7 +111,7 @@ export default function AuthModal() {
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-serif font-bold text-black">
-            {mode === 'login' ? t('Welcome Back') : mode === 'signup' ? t('Create Account') : mode === 'email-link' ? t('Email Magic Link') : mode === 'forgot-password' ? t('Reset Password') : t('Phone Login')}
+            {mode === 'login' ? t('Welcome Back') : mode === 'signup' ? t('Create Account') : t('Reset Password')}
           </h2>
           <button 
             onClick={closeAuthModal}
@@ -219,23 +134,21 @@ export default function AuthModal() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {(mode === 'login' || mode === 'signup' || mode === 'email-link' || mode === 'forgot-password') && (
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                  {t('Email Address')}
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-gray-50 border border-transparent rounded-xl py-3 px-4 text-sm focus:border-gray-200 focus:bg-white focus:ring-2 focus:ring-black/5 text-black placeholder-gray-400 transition-all text-left rtl:text-right"
-                  placeholder="you@example.com"
-                />
-              </div>
-            )}
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                {t('Email Address')}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-gray-50 border border-transparent rounded-xl py-3 px-4 text-sm focus:border-gray-200 focus:bg-white focus:ring-2 focus:ring-black/5 text-black placeholder-gray-400 transition-all text-left rtl:text-right"
+                placeholder="you@example.com"
+              />
+            </div>
 
-            {(mode === 'login' || mode === 'signup') && (
+            {mode !== 'forgot-password' && (
               <div>
                 <div className="flex justify-between items-center mb-2 mt-4">
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -260,42 +173,6 @@ export default function AuthModal() {
                   placeholder="••••••••"
                 />
               </div>
-            )}
-
-            {mode === 'phone' && (
-              <>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-                    {t('Phone Number')}
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                    disabled={!!confirmationResult}
-                    className="w-full bg-gray-50 border border-transparent rounded-xl py-3 px-4 text-sm focus:border-gray-200 focus:bg-white focus:ring-2 focus:ring-black/5 text-black placeholder-gray-400 transition-all disabled:opacity-50 text-left rtl:text-right"
-                    placeholder="+1234567890"
-                  />
-                  <div id="recaptcha-container"></div>
-                </div>
-                
-                {confirmationResult && (
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2 mt-4">
-                      {t('Verification Code')}
-                    </label>
-                    <input
-                      type="text"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                      required
-                      className="w-full bg-gray-50 border border-transparent rounded-xl py-3 px-4 text-sm focus:border-gray-200 focus:bg-white focus:ring-2 focus:ring-black/5 text-black placeholder-gray-400 transition-all text-left rtl:text-right"
-                      placeholder="123456"
-                    />
-                  </div>
-                )}
-              </>
             )}
 
             {mode === 'signup' && (
@@ -324,13 +201,11 @@ export default function AuthModal() {
                 ? t('Processing...') 
                 : mode === 'login' ? t('Sign In') 
                 : mode === 'signup' ? t('Create Account') 
-                : mode === 'email-link' ? t('Send Link') 
-                : mode === 'forgot-password' ? t('Send Reset Link')
-                : (!confirmationResult ? t('Send OTP') : t('Verify & Login'))}
+                : t('Send Reset Link')}
             </button>
           </form>
 
-          {(mode === 'login' || mode === 'signup') && (
+          {mode !== 'forgot-password' && (
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -385,30 +260,6 @@ export default function AuthModal() {
           )}
 
           <div className="mt-8 flex flex-col gap-4 text-center">
-            <div className="flex bg-gray-50 p-1 rounded-xl">
-              <button 
-                type="button"
-                onClick={() => handleModeChange('login')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
-              >
-                {t('Password')}
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleModeChange('email-link')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'email-link' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
-              >
-                {t('Magic Link')}
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleModeChange('phone')}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'phone' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-black'}`}
-              >
-                {t('Phone')}
-              </button>
-            </div>
-            
             {mode === 'login' ? (
               <p className="text-sm text-gray-500">
                 {t('Don\'t have an account?')} <button type="button" onClick={() => handleModeChange('signup')} className="text-black font-bold hover:underline">
@@ -421,7 +272,13 @@ export default function AuthModal() {
                   {t('Sign in')}
                 </button>
               </p>
-            ) : null}
+            ) : (
+              <p className="text-sm text-gray-500">
+                <button type="button" onClick={() => handleModeChange('login')} className="text-black font-bold hover:underline">
+                  {t('Back to Sign in')}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>
