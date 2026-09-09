@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, User, Calendar, ExternalLink } from 'lucide-react';
+import { MapPin, User, Calendar, ExternalLink, ImageOff } from 'lucide-react';
 
 export interface Product {
   id: string;
@@ -43,14 +43,13 @@ export default function ProductCard({ product }: ProductCardProps) {
   const currencySymbol = product.currency || 'AED';
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
-  // معالجة ذكية شاملة لاستخراج الصور تدعم كافة أشكال التخزين القديمة والجديدة
+  // استخراج الصور بأمان
   const imageList: string[] = (() => {
     if (Array.isArray(product.images) && product.images.length > 0) {
       const validImages = product.images.filter((url): url is string => Boolean(url && typeof url === 'string' && url.trim() !== ''));
       if (validImages.length > 0) return validImages;
     }
     
-    // دعم جميع التسميات المحتملة للحقول المفردة القديمة في قاعدة البيانات
     const singleImage = product.image || product.imageUrl || product.img || product.photo;
     if (typeof singleImage === 'string' && singleImage.trim() !== '') {
       return [singleImage];
@@ -112,14 +111,26 @@ export default function ProductCard({ product }: ProductCardProps) {
                 alt={`${productName} - ${index + 1}`}
                 className="w-full h-full object-contain flex-shrink-0 snap-center mix-blend-multiply group-hover:scale-105 transition-transform duration-700"
                 onError={(e) => { 
-                  // في حال فشل الرابط نهائياً، عرض صورة بديلة رمادية افتراضية لتفادي الفراغ الكلي
-                  (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
+                  // منع تكرار الخطأ واستبدال العنصر بواجهة أيقونة بديلة محلياً دون طلب خارجي فاشل
+                  const target = e.currentTarget as HTMLImageElement;
+                  target.onerror = null; 
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent && !parent.querySelector('.fallback-icon')) {
+                    const fallbackDiv = document.createElement('div');
+                    fallbackDiv.className = 'fallback-icon flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1';
+                    fallbackDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"></line><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"></path><line x1="13.5" y1="6" x2="21" y2="6"></line><line x1="17" y1="2" x2="17" y2="10"></line><path d="M21 21H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2"></path><polyline points="9 18 15 12 21 18"></polyline></svg><span class="text-[10px]">تعذر تحميل الصورة</span>`;
+                    parent.appendChild(fallbackDiv);
+                  }
                 }}
               />
             ))}
           </div>
         ) : (
-          <div className="text-gray-400 text-xs text-center px-2">لا توجد صورة متاحة لهذا الإعلان</div>
+          <div className="flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
+            <ImageOff size={20} />
+            <span>لا توجد صورة متاحة</span>
+          </div>
         )}
       </div>
 
@@ -138,7 +149,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </>
           ) : (
             <span className="text-sm font-semibold text-gray-900">
-              {finalPrice > 0 ? `${finalPrice.toFixed(2)} ${currencySymbol}` : 'شاهد السعر بالمتجر'}
+              {finalPrice > 0 ? `${finalPrice.toFixed(2)} {currencySymbol}` : 'شاهد السعر بالمتجر'}
             </span>
           )}
         </div>
