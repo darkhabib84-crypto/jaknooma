@@ -55,7 +55,6 @@ export default function UserProfile() {
       if (docSnap.exists()) {
         setProfileData(docSnap.data() as UserData);
       } else {
-        // إذا كان المستخدم جديداً ولم ينشأ له مستند بعد
         setProfileData({ fullName: user.email?.split('@')[0] || '', phone: '', addresses: [] });
       }
       setLoadingProfile(false);
@@ -76,52 +75,69 @@ export default function UserProfile() {
     return () => unsubscribe();
   }, [user]);
 
-  // 3. جلب المفضلة الحقيقية (Wishlist)
+  // 3. جلب المفضلة الحقيقية (Wishlist) بدون قيود الـ 10 عناصر
   useEffect(() => {
     if (!user || activeTab !== 'wishlist') return;
     const q = query(collection(db, 'wishlist'), where('userId', '==', user.uid));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productIds = snapshot.docs.map(doc => doc.data().productId);
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const productIds = snapshot.docs.map(doc => doc.data().productId).filter(Boolean);
       if (productIds.length === 0) {
         setWishlistProducts([]);
         setLoadingWishlist(false);
         return;
       }
       
-      // جلب تفاصيل المنتجات المفضلة بناءً على الـ IDs
-      const productsQuery = query(collection(db, 'products'), where('__name__', 'in', productIds.slice(0, 10)));
-      const unsubProducts = onSnapshot(productsQuery, (prodSnap) => {
-        const products = prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-        setWishlistProducts(products);
+      try {
+        const productPromises = productIds.map(async (id) => {
+          const prodDoc = await getDoc(doc(db, 'products', id));
+          if (prodDoc.exists()) {
+            return { id: prodDoc.id, ...prodDoc.data() } as Product;
+          }
+          return null;
+        });
+
+        const results = await Promise.all(productPromises);
+        setWishlistProducts(results.filter((p): p is Product => p !== null));
+      } catch (error) {
+        console.error('Error fetching wishlist products:', error);
+      } finally {
         setLoadingWishlist(false);
-      });
-      return () => unsubProducts();
+      }
     });
 
     return () => unsubscribe();
   }, [user, activeTab]);
 
-  // 4. جلب سلة التسوق الحقيقية (Cart)
+  // 4. جلب سلة التسوق الحقيقية (Cart) بدون قيود الـ 10 عناصر
   useEffect(() => {
     if (!user || activeTab !== 'cart') return;
     const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const productIds = snapshot.docs.map(doc => doc.data().productId);
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const productIds = snapshot.docs.map(doc => doc.data().productId).filter(Boolean);
       if (productIds.length === 0) {
         setCartProducts([]);
         setLoadingCart(false);
         return;
       }
       
-      const productsQuery = query(collection(db, 'products'), where('__name__', 'in', productIds.slice(0, 10)));
-      const unsubProducts = onSnapshot(productsQuery, (prodSnap) => {
-        const products = prodSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-        setCartProducts(products);
+      try {
+        const productPromises = productIds.map(async (id) => {
+          const prodDoc = await getDoc(doc(db, 'products', id));
+          if (prodDoc.exists()) {
+            return { id: prodDoc.id, ...prodDoc.data() } as Product;
+          }
+          return null;
+        });
+
+        const results = await Promise.all(productPromises);
+        setCartProducts(results.filter((p): p is Product => p !== null));
+      } catch (error) {
+        console.error('Error fetching cart products:', error);
+      } finally {
         setLoadingCart(false);
-      });
-      return () => unsubProducts();
+      }
     });
 
     return () => unsubscribe();
@@ -135,15 +151,13 @@ export default function UserProfile() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let totalRevenue = 0;
       let itemsSold = 0;
-      let totalViews = 0; // إذا كنت تتبع عدد المشاهدات لحساب معدل التحويل
 
-      snapshot.docs.forEach((doc) => {
-        const orderData = doc.data();
+      snapshot.docs.forEach((docSnap) => {
+        const orderData = docSnap.data();
         totalRevenue += Number(orderData.amount || 0);
         itemsSold += Number(orderData.quantity || 1);
       });
 
-      // افتراض حساب معدل تحويل حقيقي إذا كان لديك حقل لمشاهدات متجر البائع
       const conversionRate = itemsSold > 0 ? Math.min(Math.round((itemsSold / (itemsSold + 20)) * 100), 100) : 0;
 
       setSalesStats({
@@ -280,7 +294,7 @@ export default function UserProfile() {
           {/* Content Area */}
           <div className="flex-1 bg-white/60 backdrop-blur-3xl rounded-3xl p-6 md:p-10 border border-white shadow-xl shadow-gray-200/50">
             
-            {/* 1. Profile Tab (حقيقي بالكامل) */}
+            {/* 1. Profile Tab */}
             {activeTab === 'profile' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {loadingProfile ? (
@@ -389,7 +403,7 @@ export default function UserProfile() {
                      {[1, 2, 3].map(i => (
                        <div key={i} className="h-24 bg-gray-100 rounded-2xl w-full"></div>
                      ))}
-                   </div>
+                  </div>
                 ) : myProducts.length > 0 ? (
                    <div className="space-y-4">
                      {myProducts.map(product => (
@@ -399,26 +413,26 @@ export default function UserProfile() {
                              {product.images && product.images[0] && (
                                <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
                              )}
-                           </div>
-                           <div>
+                          </div>
+                          <div>
                              <h4 className="font-bold text-gray-900">{product.name}</h4>
-                             <p className="text-sm text-gray-500">${product.price} • {product.location || 'Unknown location'}</p>
-                           </div>
-                         </div>
-                         <div className="flex items-center gap-3">
+                           <p className="text-sm text-gray-500">${product.price} • {product.location || 'Unknown location'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
                            {!product.isVIP ? (
                              <a href="https://buy.stripe.com/00w00i9rC5ly8vL8wF2Fa00" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 rounded-lg text-sm font-bold transition-colors">
                                <Crown className="w-4 h-4" /> {t('Upgrade to VIP')}
-                             </a>
-                           ) : (
+                            </a>
+                          ) : (
                              <span className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-bold uppercase tracking-wider">
                                <Crown className="w-3.5 h-3.5" /> VIP
-                             </span>
-                           )}
-                         </div>
-                       </div>
-                     ))}
-                   </div>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="text-center py-20">
                     <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -432,7 +446,7 @@ export default function UserProfile() {
               </div>
             )}
             
-            {/* 3. Shopping List Tab (حقيقي بالكامل) */}
+            {/* 3. Shopping List Tab */}
             {activeTab === 'cart' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><ShoppingBag className="w-5 h-5 text-black" /> {t('Shopping List')}</h3>
@@ -463,7 +477,7 @@ export default function UserProfile() {
               </div>
             )}
 
-            {/* 4. Sales Insights Tab (حقيقي بالكامل) */}
+            {/* 4. Sales Insights Tab */}
             {activeTab === 'sales' && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center justify-between">
@@ -513,7 +527,7 @@ export default function UserProfile() {
               </div>
             )}
 
-            {/* 5. Wishlist Tab (حقيقي بالكامل) */}
+            {/* 5. Wishlist Tab */}
             {activeTab === 'wishlist' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Heart className="w-5 h-5 text-red-500 fill-red-500" /> {t('Wishlist')}</h3>
