@@ -12,34 +12,52 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: "2026-06-24.dahlia",
 });
 
-// إعداد تطبيق Express للتعامل مع مسارات الـ API (مثل /api/search-agent)
+// إعداد تطبيق Express للتعامل مع مسارات الـ API
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-// 1. نقطة النهاية الخاصة بالبحث (AI Search Agent)
+// 1. نقطة النهاية الخاصة بالبحث (AI Search Agent) مع تفعيل البحث الحقيقي في Firestore
 app.get("/search-agent", async (req, res) => {
-  const keyword = req.query.q as string;
+  const keyword = (req.query.q as string || "").toLowerCase().trim();
   
   if (!keyword) {
-    res.status(400).json({ success: false, message: "Keyword is required" });
-    return;
+    return res.status(400).json({ success: false, message: "Keyword is required" });
   }
 
   try {
     logger.info(`AI Search Agent searching for: ${keyword}`);
 
-    // يمكنك هنا إضافة منطق البحث الخارجي (سحب البيانات أو استدعاء API المتاجر)
-    // كمثال تجريبي حالياً لضمان عودة استجابة صحيحة بصيغة JSON:
+    // جلب المنتجات من مجموعة products في Firestore والبحث فيها بمرونة
+    const snapshot = await admin.firestore().collection("products").get();
     const products: any[] = [];
 
-    res.json({
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const name = (data.name || data.title || "").toLowerCase();
+      const category = (data.category || "").toLowerCase();
+      const storeName = (data.storeName || "").toLowerCase();
+
+      // مطابقة مرنة للبحث داخل الاسم، القسم، أو اسم المتجر
+      if (
+        name.includes(keyword) || 
+        category.includes(keyword) || 
+        storeName.includes(keyword)
+      ) {
+        products.push({
+          id: doc.id,
+          ...data
+        });
+      }
+    });
+
+    return res.json({
       success: true,
       products: products
     });
   } catch (error: any) {
     logger.error(`Search Agent Error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, products: [], message: error.message });
   }
 });
 
@@ -57,8 +75,7 @@ export const stripeWebhook = onRequest(async (req, res) => {
     event = stripe.webhooks.constructEvent(req.rawBody, sig as string, webhookSecret as string);
   } catch (err: any) {
     logger.error(`Webhook Error: ${err.message}`);
-    res.status(400).send(`Webhook Error: ${err.message}`);
-    return;
+    return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   // معالجة الدفع الناجح
@@ -79,5 +96,5 @@ export const stripeWebhook = onRequest(async (req, res) => {
     logger.info("Payment saved to Firestore successfully");
   }
 
-  res.json({ received: true });
+  return res.json({ received: true });
 });
