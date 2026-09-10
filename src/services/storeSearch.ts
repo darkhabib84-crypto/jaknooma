@@ -50,9 +50,8 @@ export const LEGAL_EXTERNAL_STORES: LegalStoreConfig[] = [
 ];
 
 const SEARCH_AGENT_URL = '/api/search-agent';
-const RAPID_API_KEY = 'YOUR_RAPIDAPI_KEY_HERE';
 
-// ذاكرة مؤقتة لمنع تكرار الطلبات ونفاذ الرصيد
+// ذاكرة مؤقتة لمنع تكرار الطلبات المتطابقة
 const searchCache = new Map<string, Product[]>();
 
 const parseSafePrice = (priceVal: any): number => {
@@ -78,99 +77,6 @@ const parseSafeImage = (item: any): string => {
   return '';
 };
 
-const fetchOfficialStoreApi = async (store: StoreApiConfig, keyword: string): Promise<Product[]> => {
-  if (!store.apiUrl) return [];
-
-  try {
-    const url = new URL(store.apiUrl);
-    url.searchParams.append('q', keyword);
-
-    const headers: Record<string, string> = {
-      'Accept': 'application/json'
-    };
-
-    if (store.apiUrl.includes('rapidapi.com')) {
-      headers['x-rapidapi-key'] = store.apiKey || RAPID_API_KEY;
-      headers['x-rapidapi-host'] = url.hostname;
-    } else if (store.apiKey) {
-      headers['Authorization'] = `Bearer ${store.apiKey}`;
-    }
-
-    const response = await fetch(url.toString(), { headers });
-    const contentType = response.headers.get('content-type');
-
-    if (response.ok && contentType && contentType.includes('application/json')) {
-      const data = await response.json();
-      const results = Array.isArray(data) ? data : (data.items || data.products || data.results || data.data || []);
-
-      return results.map((item: any) => ({
-        id: `${store.id}-${item.id || item.asin || item.itemId || Math.random().toString(36).substring(7)}`,
-        title: item.title || item.product_title || item.name || '',
-        name: item.title || item.product_title || item.name || '',
-        price: parseSafePrice(item.price || item.product_price || item.offer_price),
-        originalPrice: parseSafePrice(item.originalPrice || item.product_original_price),
-        rating: parseFloat(item.rating || item.product_star_rating) || 0,
-        reviews: parseInt(item.reviews || item.product_num_ratings) || 0,
-        image: parseSafeImage(item),
-        images: [parseSafeImage(item)],
-        category: store.name,
-        externalUrl: item.url || item.product_url || item.affiliate_link || item.product_page_url || '',
-        storeName: store.name,
-        storeId: store.id,
-        isExternalProduct: true,
-        isVIP: false,
-        createdAt: new Date().toISOString()
-      } as Product));
-    }
-
-    if (response.status === 429) {
-      console.warn(`[Jaknooma Rate Limit] ${store.name} 429 - تم تجاوز حد الطلبات`);
-    } else if (response.status === 403) {
-      console.warn(`[Jaknooma Auth Error] ${store.name} 403 - المفتاح غير صالح أو انتهت الحصة`);
-    }
-
-    return [];
-  } catch (error) {
-    return [];
-  }
-};
-
-const fetchAgentResults = async (keyword: string): Promise<Product[]> => {
-  try {
-    const response = await fetch(`${SEARCH_AGENT_URL}?q=${encodeURIComponent(keyword)}`);
-    const contentType = response.headers.get('content-type');
-
-    if (!response.ok || !contentType || !contentType.includes('application/json')) {
-      return [];
-    }
-
-    const data = await response.json();
-    if (!data.success || !Array.isArray(data.products)) return [];
-
-    return data.products.map((item: any) => ({
-      id: item.id || `agent-${Math.random().toString(36).substring(7)}`,
-      title: item.name || item.title || '',
-      name: item.name || item.title || '',
-      price: parseSafePrice(item.price),
-      originalPrice: parseSafePrice(item.originalPrice || item.price),
-      rating: 4.5,
-      reviews: 0,
-      image: parseSafeImage(item),
-      images: [parseSafeImage(item)],
-      category: item.storeName || 'متجر خارجي',
-      externalUrl: item.externalUrl || '',
-      storeName: item.storeName || 'متجر خارجي',
-      sellerName: item.storeName || 'متجر خارجي',
-      location: 'شحن دولي',
-      isExternalProduct: true,
-      isVIP: false,
-      createdAt: new Date().toISOString()
-    } as Product));
-  } catch (error) {
-    return [];
-  }
-};
-
 export async function universalSearch(
   keyword: string,
   activeStores: StoreApiConfig[],
@@ -178,48 +84,66 @@ export async function universalSearch(
 ): Promise<Product[]> {
   const query = keyword.toLowerCase().trim();
 
-  // تصفية المنتجات المحلية أولاً
+  // 1. تصفية المنتجات المحلية أولاً
   const localResults = localProducts.filter(p => {
     if (!query) return true;
     const productName = (p.name || p.title || '').toLowerCase();
     const productCategory = (p.category || '').toLowerCase();
-    return productName.includes(query) || productCategory.includes(query);
+    const storeName = (p.storeName || '').toLowerCase();
+    return productName.includes(query) || productCategory.includes(query) || storeName.includes(query);
   });
 
   if (!query) {
     return localResults;
   }
 
-  // الاسترجاع من الـ Cache إذا أجريت نفس عملية البحث سابقاً
+  // 2. التحقق من الذاكرة المؤقتة
   if (searchCache.has(query)) {
     const cachedResults = searchCache.get(query) || [];
-    return [...localResults, ...cachedResults];
+    const existingIds = new Set(localResults.map(p => p.id));
+    const uniqueCached = cachedResults.filter(p => !existingIds.has(p.id));
+    return [...localResults, ...uniqueCached];
   }
 
-  // البحث في المتاجر المربوطة
-  const apiStores = activeStores.filter(s => s.apiUrl);
-  let directApiResults: Product[] = [];
+  // 3. جلب النتائج بأمان من سيرفر الـ Backend الخاص بنا (بدون CORS وبدون بركسيات خارجية)
+  try {
+    const response = await fetch(`${SEARCH_AGENT_URL}?q=${encodeURIComponent(query)}`);
+    const contentType = response.headers.get('content-type');
 
-  if (apiStores.length > 0) {
-    try {
-      const resultsArrays = await Promise.all(
-        apiStores.map(store => fetchOfficialStoreApi(store, query))
-      );
-      directApiResults = resultsArrays.flat();
-    } catch (error) {
-      console.error('[Jaknooma Direct API Error]', error);
+    if (response.ok && contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      if (data.success && Array.isArray(data.products)) {
+        const remoteProducts: Product[] = data.products.map((item: any) => ({
+          id: item.id || `agent-${Math.random().toString(36).substring(7)}`,
+          title: item.title || item.name || '',
+          name: item.title || item.name || '',
+          price: parseSafePrice(item.price),
+          originalPrice: parseSafePrice(item.originalPrice || item.price),
+          rating: parseFloat(item.rating) || 4.5,
+          reviews: parseInt(item.reviews) || 0,
+          image: parseSafeImage(item),
+          images: [parseSafeImage(item)],
+          category: item.category || item.storeName || 'متجر خارجي',
+          externalUrl: item.externalUrl || item.url || '',
+          storeName: item.storeName || 'متجر خارجي',
+          sellerName: item.storeName || 'متجر خارجي',
+          location: 'شحن دولي',
+          isExternalProduct: true,
+          isVIP: false,
+          createdAt: new Date().toISOString()
+        }));
+
+        searchCache.set(query, remoteProducts);
+        
+        const existingIds = new Set(localResults.map(p => p.id));
+        const uniqueRemote = remoteProducts.filter(p => !existingIds.has(p.id));
+        
+        return [...localResults, ...uniqueRemote];
+      }
     }
+  } catch (error) {
+    console.error('[Jaknooma Search Fetch Error]:', error);
   }
 
-  // البحث عن طريق الـ Agent
-  const agentResults = await fetchAgentResults(query);
-
-  const combinedExternal = [...directApiResults, ...agentResults];
-
-  // حفظ نتائج البحث الخارجي في الذاكرة المؤقتة
-  if (combinedExternal.length > 0) {
-    searchCache.set(query, combinedExternal);
-  }
-
-  return [...localResults, ...combinedExternal];
+  return localResults;
 }
