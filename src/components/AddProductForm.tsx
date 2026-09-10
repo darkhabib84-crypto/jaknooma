@@ -16,7 +16,6 @@ export default function AddProductForm() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState('AED'); // حالة العملة المحددة
-  const [discountType, setDiscountType] = useState('none');
   const [condition, setCondition] = useState('New');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState(''); // حقل الموقع الجديد
@@ -99,7 +98,6 @@ export default function AddProductForm() {
         sellerName: user.displayName || user.email?.split('@')[0] || 'Anonymous Seller', // حفظ اسم البائع
         location: location, // حفظ الموقع المحدد
         createdAt: serverTimestamp(), // التاريخ الفعلي لوضع الإعلان
-        discountType,
         condition,
         phone,
         affiliateLink,
@@ -178,42 +176,32 @@ export default function AddProductForm() {
         required 
       />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* مربع السعر المطور ودعم الكسور والعملة */}
-        <div className="flex gap-2">
-          <input 
-            type="number" 
-            step="0.01"
-            min="0"
-            placeholder="Price (e.g. 10.50)" 
-            className="w-2/3 p-4 border rounded-2xl text-left focus:outline-none focus:ring-2 focus:ring-black" 
-            onChange={e => setPrice(e.target.value)} 
-            required 
-          />
-          <select 
-            value={currency} 
-            onChange={e => setCurrency(e.target.value)} 
-            className="w-1/3 p-4 border rounded-2xl bg-white text-left font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
-          >
-            <option value="AED">AED (د.إ)</option>
-            <option value="USD">USD ($)</option>
-            <option value="SAR">SAR (ر.س)</option>
-            <option value="EUR">EUR (€)</option>
-            <option value="GBP">GBP (£)</option>
-            <option value="KWD">KWD (د.ك)</option>
-            <option value="QAR">QAR (ر.ق)</option>
-            <option value="BHD">BHD (د.ب)</option>
-            <option value="OMR">OMR (ر.ع)</option>
-            <option value="EGP">EGP (ج.م)</option>
-          </select>
-        </div>
-
+      {/* مربع السعر المطور ودعم الكسور والعملة (تم جعلها عريضة بالكامل بعد إزالة حقل الخصم) */}
+      <div className="flex gap-2 w-full">
+        <input 
+          type="number" 
+          step="0.01"
+          min="0"
+          placeholder="Price (e.g. 10.50)" 
+          className="w-2/3 p-4 border rounded-2xl text-left focus:outline-none focus:ring-2 focus:ring-black" 
+          onChange={e => setPrice(e.target.value)} 
+          required 
+        />
         <select 
-          onChange={e => setDiscountType(e.target.value)} 
-          className="p-4 border rounded-2xl bg-white text-left"
+          value={currency} 
+          onChange={e => setCurrency(e.target.value)} 
+          className="w-1/3 p-4 border rounded-2xl bg-white text-left font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
         >
-          <option value="none">No Discount</option>
-          <option value="gold">Gold Discount</option>
+          <option value="AED">AED (د.إ)</option>
+          <option value="USD">USD ($)</option>
+          <option value="SAR">SAR (ر.س)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="GBP">GBP (£)</option>
+          <option value="KWD">KWD (د.ك)</option>
+          <option value="QAR">QAR (ر.ق)</option>
+          <option value="BHD">BHD (د.ب)</option>
+          <option value="OMR">OMR (ر.ع)</option>
+          <option value="EGP">EGP (ج.م)</option>
         </select>
       </div>
       
