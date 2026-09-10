@@ -76,7 +76,14 @@ export default function AuthModal() {
         
         closeAuthModal();
       } else if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        
+        // حفظ ملف المستخدم أو تحديثه عند تسجيل الدخول (يتكفل بالحسابات القديمة والجديدة)
+        await saveUserProfile(userCredential.user.uid, {
+          email: userCredential.user.email,
+          name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || "User",
+        });
+
         closeAuthModal();
       } else if (mode === 'forgot-password') {
         await sendPasswordResetEmail(auth, email);
