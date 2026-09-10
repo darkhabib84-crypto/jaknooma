@@ -9,9 +9,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm ci && npm run build
+      
+      # 1. نشر الموقع (Hosting) كما هو
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' # سأخبرك بكيفية استخراجه إن احتجت
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
-          projectId: jaknooma # اسم مشروعك في فايربيس
+          projectId: jaknooma
+
+      # 2. نشر قواعد التخزين (Storage Rules) لتفعيل الصور فوراً
+      - name: Deploy Storage Rules to Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > ./service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS="./service-account.json"
+          npx firebase-tools deploy --only storage --project jaknooma
