@@ -1,0 +1,23 @@
+workflows:
+  jaknooma-android-workflow:
+    name: Build Jaknooma Android App
+    instance_type: mac_mini_m1
+    environment:
+      node: 20.x
+      java: 17
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web app
+        script: npm run build
+      - name: Initialize Capacitor Android
+        script: |
+          npx cap add android
+          npx cap sync android
+      - name: Build Android App Bundle (AAB)
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/*.apk
