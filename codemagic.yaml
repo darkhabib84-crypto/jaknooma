@@ -21,3 +21,23 @@ workflows:
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
       - android/app/build/outputs/apk/release/*.apk
+
+  jaknooma-ios-workflow:
+    name: Build Jaknooma iOS App
+    instance_type: mac_mini_m1
+    environment:
+      node: lts
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web app
+        script: npm run build
+      - name: Initialize Capacitor iOS
+        script: |
+          npx cap add ios
+          npx cap sync ios
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install
