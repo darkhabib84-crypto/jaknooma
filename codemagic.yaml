@@ -3,7 +3,7 @@ workflows:
     name: Build Jaknooma Android App
     instance_type: mac_mini_m1
     environment:
-      node: 20.x
+      node: lts
       java: 17
     scripts:
       - name: Install dependencies
