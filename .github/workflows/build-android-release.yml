@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: Clean install dependencies for Tailwind
         run: |
           rm -rf node_modules package-lock.json
           npm install --force
@@ -39,10 +39,8 @@ jobs:
       - name: Generate Keystore & Build Signed AAB
         run: |
           cd android/app
-          # توليد مفتاح التوقيع تلقائياً (احفظ كلمات المرور هذه جيداً ولا تغيرها في التحديثات القادمة)
           keytool -genkey -v -keystore jaknooma-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, S=Dubai, C=AE"
 
-          # دمج إعدادات التوقيع داخل ملف بناء أندرويد
           echo "
           android {
               signingConfigs {
