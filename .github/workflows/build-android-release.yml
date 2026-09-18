@@ -1,0 +1,72 @@
+name: Build Signed Android Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --force
+
+      - name: Build web project
+        run: npm run build
+
+      - name: Set up Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Add Capacitor Android Platform
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Generate Keystore & Build Signed AAB
+        run: |
+          cd android/app
+          # توليد مفتاح التوقيع تلقائياً (احفظ كلمات المرور هذه جيداً ولا تغيرها في التحديثات القادمة)
+          keytool -genkey -v -keystore jaknooma-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, S=Dubai, C=AE"
+
+          # دمج إعدادات التوقيع داخل ملف بناء أندرويد
+          echo "
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file('jaknooma-release-key.jks')
+                      storePassword 'jaknooma123'
+                      keyAlias 'jaknooma-alias'
+                      keyPassword 'jaknooma123'
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          " >> build.gradle
+
+          cd ../..
+          cd android
+          ./gradlew bundleRelease
+
+      - name: Upload Signed AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-play-release-bundle
+          path: android/app/build/outputs/bundle/release/*.aab
