@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً متى شئت من صفحة Actions
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,10 +19,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Clean install dependencies for Tailwind
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --force
 
       - name: Build web project
         run: npm run build
@@ -43,10 +44,8 @@ jobs:
       - name: Generate Release Keystore Automatically
         run: |
           cd android/app
-          # توليد مفتاح توقيع تلقائياً برمجياً لكي يتم توقيع التطبيق به
           keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=City, S=State, C=US"
           
-          # تعديل ملف build.gradle لتضمين التوقيع أوتوماتيكياً
           echo "
           android {
               signingConfigs {
