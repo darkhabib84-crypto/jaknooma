@@ -15,10 +15,11 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Clean install dependencies for Tailwind
+      - name: Clean install and fix Tailwind Oxide for Linux
         run: |
           rm -rf node_modules package-lock.json
-          npm install --force
+          npm cache clean --force
+          npm install --include=optional --force
 
       - name: Build web project
         run: npm run build
