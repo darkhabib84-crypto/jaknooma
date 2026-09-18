@@ -29,12 +29,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Add Capacitor Android Platform
+      - name: Add Capacitor Android Platform & Update Version Code
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
           npx cap sync android
+          
+          # رفع رقم الإصدار تلقائياً لتجنب مشاكل الترقية في جوجل بلاي
+          sed -i 's/versionCode 1/versionCode 10/g' android/app/build.gradle
+          sed -i 's/versionName "1.0"/versionName "1.0.1"/g' android/app/build.gradle
 
       - name: Generate Keystore & Build Signed AAB
         run: |
