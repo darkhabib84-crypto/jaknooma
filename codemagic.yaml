@@ -17,7 +17,6 @@ workflows:
           python3 -c '
           import re, os
 
-          # 1. تحديث إعدادات SDK في variables.gradle بأمان
           var_path = "android/variables.gradle"
           if os.path.exists(var_path):
               with open(var_path, "r") as f:
@@ -28,7 +27,6 @@ workflows:
               with open(var_path, "w") as f:
                   f.write(content)
 
-          # 2. حقن إعدادات التوقيع فقط إذا كانت متوفرة في بيئة Codemagic
           gradle_path = "android/app/build.gradle"
           keystore_path = os.environ.get("CM_KEYSTORE_PATH", "")
           if os.path.exists(gradle_path) and keystore_path:
@@ -36,18 +34,9 @@ workflows:
                   gradle_content = f.read()
               
               if "signingConfigs" not in gradle_content:
-                  signing_block = f"""
-    signingConfigs {{
-        release {{
-            storeFile file("{keystore_path}")
-            storePassword "{os.environ.get("CM_KEYSTORE_PASSWORD", "")}"
-            keyAlias "{os.environ.get("CM_KEYSTORE_ALIAS", "")}"
-            keyPassword "{os.environ.get("CM_KEYSTORE_PRIVATE_KEY_PASSWORD", "")}"
-        }}
-    }}
-                  """
+                  signing_block = "\n    signingConfigs {\n        release {\n            storeFile file(\"" + keystore_path + "\")\n            storePassword \"" + os.environ.get("CM_KEYSTORE_PASSWORD", "") + "\"\n            keyAlias \"" + os.environ.get("CM_KEYSTORE_ALIAS", "") + "\"\n            keyPassword \"" + os.environ.get("CM_KEYSTORE_PRIVATE_KEY_PASSWORD", "") + "\"\n        }\n    }\n"
                   gradle_content = gradle_content.replace("android {", "android {" + signing_block, 1)
-                  gradle_content = gradle_content.replace("release {", "release {{\n            signingConfig signingConfigs.release", 1)
+                  gradle_content = gradle_content.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
                   with open(gradle_path, "w") as f:
                       f.write(gradle_content)
           '
