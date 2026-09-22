@@ -10,45 +10,22 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Initialize Capacitor Android, Set API & Signing
+      - name: Initialize Capacitor Android & Set API Versions
         script: |
           npx cap add android
           npx cap sync android
           node -e '
             const fs = require("fs");
-            
-            // 1. Update SDK Versions
-            ["android/variables.gradle", "android/build.gradle"].forEach(file => {
+            const files = ["android/variables.gradle", "android/build.gradle"];
+            files.forEach(file => {
               if (fs.existsSync(file)) {
-                let c = fs.readFileSync(file, "utf8");
-                c = c.replace(/compileSdkVersion\s*(=|\s)\s*\d+/g, "compileSdkVersion = 36");
-                c = c.replace(/targetSdkVersion\s*(=|\s)\s*\d+/g, "targetSdkVersion = 36");
-                c = c.replace(/minSdkVersion\s*(=|\s)\s*\d+/g, "minSdkVersion = 24");
-                fs.writeFileSync(file, c, "utf8");
+                let content = fs.readFileSync(file, "utf8");
+                content = content.replace(/compileSdkVersion\s*=\s*\d+/g, "compileSdkVersion = 36");
+                content = content.replace(/targetSdkVersion\s*=\s*\d+/g, "targetSdkVersion = 36");
+                content = content.replace(/minSdkVersion\s*=\s*\d+/g, "minSdkVersion = 24");
+                fs.writeFileSync(file, content, "utf8");
               }
             });
-
-            // 2. Add Keystore Signing Config to build.gradle
-            let gradleFile = "android/app/build.gradle";
-            if (fs.existsSync(gradleFile)) {
-              let content = fs.readFileSync(gradleFile, "utf8");
-              const signingBlock = `
-    signingConfigs {
-        release {
-            storeFile file(System.getenv("CM_KEYSTORE_PATH") ?: "")
-            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
-            keyAlias System.getenv("CM_KEYSTORE_ALIAS") ?: ""
-            keyPassword System.getenv("CM_KEYSTORE_PRIVATE_KEY_PASSWORD") ?: ""
-        }
-    }
-              `;
-              content = content.replace("android {", "android {" + signingBlock);
-              content = content.replace(
-                /buildTypes\s*\{[\s\S]*?release\s*\{/,
-                match => match + "\n            signingConfig signingConfigs.release"
-              );
-              fs.writeFileSync(gradleFile, content, "utf8");
-            }
           '
       - name: Build Android App Bundle (AAB)
         script: |
