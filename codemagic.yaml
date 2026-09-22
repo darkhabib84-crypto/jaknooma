@@ -10,12 +10,14 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Initialize Capacitor Android & Set API Versions
+      - name: Initialize Capacitor Android, Set API & Signing
         script: |
           npx cap add android
           npx cap sync android
           node -e '
             const fs = require("fs");
+            
+            // 1. Update SDK Versions
             ["android/variables.gradle", "android/build.gradle"].forEach(file => {
               if (fs.existsSync(file)) {
                 let c = fs.readFileSync(file, "utf8");
@@ -25,6 +27,28 @@ workflows:
                 fs.writeFileSync(file, c, "utf8");
               }
             });
+
+            // 2. Add Keystore Signing Config to build.gradle
+            let gradleFile = "android/app/build.gradle";
+            if (fs.existsSync(gradleFile)) {
+              let content = fs.readFileSync(gradleFile, "utf8");
+              const signingBlock = `
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("CM_KEYSTORE_PATH") ?: "")
+            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("CM_KEYSTORE_ALIAS") ?: ""
+            keyPassword System.getenv("CM_KEYSTORE_PRIVATE_KEY_PASSWORD") ?: ""
+        }
+    }
+              `;
+              content = content.replace("android {", "android {" + signingBlock);
+              content = content.replace(
+                /buildTypes\s*\{[\s\S]*?release\s*\{/,
+                match => match + "\n            signingConfig signingConfigs.release"
+              );
+              fs.writeFileSync(gradleFile, content, "utf8");
+            }
           '
       - name: Build Android App Bundle (AAB)
         script: |
