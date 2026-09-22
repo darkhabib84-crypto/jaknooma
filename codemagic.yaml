@@ -28,7 +28,7 @@ workflows:
           if os.path.exists(gf):
               c = open(gf).read()
               if "signingConfigs" not in c:
-                  sc = "\n    signingConfigs {\n        release {\n            storeFile file(os.environ.get(\"CM_KEYSTORE_PATH\", \"\"))\n            storePassword os.environ.get(\"CM_KEYSTORE_PASSWORD\", \"\"))\n            keyAlias os.environ.get(\"CM_KEYSTORE_ALIAS\", \"\"))\n            keyPassword os.environ.get(\"CM_KEYSTORE_PRIVATE_KEY_PASSWORD\", \"\"))\n        }\n    }\n"
+                  sc = "\n    signingConfigs {\n        release {\n            storeFile file(System.getenv(\"CM_KEYSTORE_PATH\") ?: \"\")\n            storePassword System.getenv(\"CM_KEYSTORE_PASSWORD\") ?: \"\"\n            keyAlias System.getenv(\"CM_KEYSTORE_ALIAS\") ?: \"\"\n            keyPassword System.getenv(\"CM_KEYSTORE_PRIVATE_KEY_PASSWORD\") ?: \"\"\n        }\n    }\n"
                   c = c.replace("android {", "android {" + sc, 1)
                   c = c.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
                   open(gf, "w").write(c)
