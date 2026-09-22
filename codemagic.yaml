@@ -14,41 +14,24 @@ workflows:
         script: |
           npx cap add android
           npx cap sync android
-          node -e '
-            const fs = require("fs");
-            
-            // 1. تحديث إعدادات الـ SDK (Compile & Target 36, Min 24)
-            ["android/variables.gradle", "android/build.gradle"].forEach(file => {
-              if (fs.existsSync(file)) {
-                let content = fs.readFileSync(file, "utf8");
-                content = content.replace(/compileSdkVersion\s*=\s*\d+/g, "compileSdkVersion = 36");
-                content = content.replace(/targetSdkVersion\s*=\s*\d+/g, "targetSdkVersion = 36");
-                content = content.replace(/minSdkVersion\s*=\s*\d+/g, "minSdkVersion = 24");
-                fs.writeFileSync(file, content, "utf8");
-              }
-            });
+          python3 -c '
+          import re, os
+          for f in ["android/variables.gradle", "android/build.gradle"]:
+              if os.path.exists(f):
+                  c = open(f).read()
+                  c = re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", c)
+                  c = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", c)
+                  c = re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", c)
+                  open(f, "w").write(c)
 
-            // 2. حقن إعدادات التوقيع (Keystore) تلقائياً في ملف build.gradle
-            const gradleFile = "android/app/build.gradle";
-            if (fs.existsSync(gradleFile)) {
-              let gradleContent = fs.readFileSync(gradleFile, "utf8");
-              
-              if (!gradleContent.includes("signingConfigs")) {
-                const signingCode = `
-    signingConfigs {
-        release {
-            storeFile file(System.getenv("CM_KEYSTORE_PATH") ?: "")
-            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
-            keyAlias System.getenv("CM_KEYSTORE_ALIAS") ?: ""
-            keyPassword System.getenv("CM_KEYSTORE_PRIVATE_KEY_PASSWORD") ?: ""
-        }
-    }
-                `;
-                gradleContent = gradleContent.replace("android {", "android {" + signingCode);
-                gradleContent = gradleContent.replace("release {", "release {\n            signingConfig signingConfigs.release");
-                fs.writeFileSync(gradleFile, gradleContent, "utf8");
-              }
-            }
+          gf = "android/app/build.gradle"
+          if os.path.exists(gf):
+              c = open(gf).read()
+              if "signingConfigs" not in c:
+                  sc = "\n    signingConfigs {\n        release {\n            storeFile file(os.environ.get(\"CM_KEYSTORE_PATH\", \"\"))\n            storePassword os.environ.get(\"CM_KEYSTORE_PASSWORD\", \"\"))\n            keyAlias os.environ.get(\"CM_KEYSTORE_ALIAS\", \"\"))\n            keyPassword os.environ.get(\"CM_KEYSTORE_PRIVATE_KEY_PASSWORD\", \"\"))\n        }\n    }\n"
+                  c = c.replace("android {", "android {" + sc, 1)
+                  c = c.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
+                  open(gf, "w").write(c)
           '
       - name: Build Android App Bundle (AAB)
         script: |
