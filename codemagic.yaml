@@ -16,22 +16,40 @@ workflows:
           npx cap sync android
           python3 -c '
           import re, os
-          for f in ["android/variables.gradle", "android/build.gradle"]:
-              if os.path.exists(f):
-                  c = open(f).read()
-                  c = re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", c)
-                  c = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", c)
-                  c = re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", c)
-                  open(f, "w").write(c)
 
-          gf = "android/app/build.gradle"
-          if os.path.exists(gf):
-              c = open(gf).read()
-              if "signingConfigs" not in c:
-                  sc = "\n    signingConfigs {\n        release {\n            storeFile file(System.getenv(\"CM_KEYSTORE_PATH\") ?: \"\")\n            storePassword System.getenv(\"CM_KEYSTORE_PASSWORD\") ?: \"\"\n            keyAlias System.getenv(\"CM_KEYSTORE_ALIAS\") ?: \"\"\n            keyPassword System.getenv(\"CM_KEYSTORE_PRIVATE_KEY_PASSWORD\") ?: \"\"\n        }\n    }\n"
-                  c = c.replace("android {", "android {" + sc, 1)
-                  c = c.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
-                  open(gf, "w").write(c)
+          # 1. تحديث إعدادات SDK في variables.gradle بأمان
+          var_path = "android/variables.gradle"
+          if os.path.exists(var_path):
+              with open(var_path, "r") as f:
+                  content = f.read()
+              content = re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", content)
+              content = re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", content)
+              content = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", content)
+              with open(var_path, "w") as f:
+                  f.write(content)
+
+          # 2. حقن إعدادات التوقيع فقط إذا كانت متوفرة في بيئة Codemagic
+          gradle_path = "android/app/build.gradle"
+          keystore_path = os.environ.get("CM_KEYSTORE_PATH", "")
+          if os.path.exists(gradle_path) and keystore_path:
+              with open(gradle_path, "r") as f:
+                  gradle_content = f.read()
+              
+              if "signingConfigs" not in gradle_content:
+                  signing_block = f"""
+    signingConfigs {{
+        release {{
+            storeFile file("{keystore_path}")
+            storePassword "{os.environ.get("CM_KEYSTORE_PASSWORD", "")}"
+            keyAlias "{os.environ.get("CM_KEYSTORE_ALIAS", "")}"
+            keyPassword "{os.environ.get("CM_KEYSTORE_PRIVATE_KEY_PASSWORD", "")}"
+        }}
+    }}
+                  """
+                  gradle_content = gradle_content.replace("android {", "android {" + signing_block, 1)
+                  gradle_content = gradle_content.replace("release {", "release {{\n            signingConfig signingConfigs.release", 1)
+                  with open(gradle_path, "w") as f:
+                      f.write(gradle_content)
           '
       - name: Build Android App Bundle (AAB)
         script: |
