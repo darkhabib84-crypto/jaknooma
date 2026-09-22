@@ -10,14 +10,15 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Initialize Capacitor Android & Set API Versions
+      - name: Initialize Capacitor Android, Set API & Sign
         script: |
           npx cap add android
           npx cap sync android
           node -e '
             const fs = require("fs");
-            const files = ["android/variables.gradle", "android/build.gradle"];
-            files.forEach(file => {
+            
+            // 1. تحديث إعدادات الـ SDK (Compile & Target 36, Min 24)
+            ["android/variables.gradle", "android/build.gradle"].forEach(file => {
               if (fs.existsSync(file)) {
                 let content = fs.readFileSync(file, "utf8");
                 content = content.replace(/compileSdkVersion\s*=\s*\d+/g, "compileSdkVersion = 36");
@@ -26,6 +27,28 @@ workflows:
                 fs.writeFileSync(file, content, "utf8");
               }
             });
+
+            // 2. حقن إعدادات التوقيع (Keystore) تلقائياً في ملف build.gradle
+            const gradleFile = "android/app/build.gradle";
+            if (fs.existsSync(gradleFile)) {
+              let gradleContent = fs.readFileSync(gradleFile, "utf8");
+              
+              if (!gradleContent.includes("signingConfigs")) {
+                const signingCode = `
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("CM_KEYSTORE_PATH") ?: "")
+            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("CM_KEYSTORE_ALIAS") ?: ""
+            keyPassword System.getenv("CM_KEYSTORE_PRIVATE_KEY_PASSWORD") ?: ""
+        }
+    }
+                `;
+                gradleContent = gradleContent.replace("android {", "android {" + signingCode);
+                gradleContent = gradleContent.replace("release {", "release {\n            signingConfig signingConfigs.release");
+                fs.writeFileSync(gradleFile, gradleContent, "utf8");
+              }
+            }
           '
       - name: Build Android App Bundle (AAB)
         script: |
