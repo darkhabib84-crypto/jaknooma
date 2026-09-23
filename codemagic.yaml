@@ -15,19 +15,15 @@ workflows:
           npx cap add android
           npx cap sync android
           
-          # إنشاء مجلد للشهادات إذا لم يكن موجوداً
           mkdir -p keystores
-          
-          # توليد ملف Keystore افتراضي سحابياً إذا لم يكن موجوداً
           KEYSTORE_PATH="keystores/jaknooma-key.jks"
           if [ ! -f "$KEYSTORE_PATH" ]; then
             keytool -genkey -v -keystore "$KEYSTORE_PATH" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
           fi
           
-          # تحديث الـ SDK وحقن التوقيع تلقائياً عبر بايثون
-          python3 -c '
+          python3 - << 'EOF'
           import re, os, shutil
-          
+
           var_path = "android/variables.gradle"
           if os.path.exists(var_path):
               with open(var_path, "r") as f:
@@ -40,8 +36,8 @@ workflows:
 
           gradle_path = "android/app/build.gradle"
           if os.path.exists(gradle_path):
-              # نسخ مفتاح Keystore إلى مجلد المشروع الداخلي
-              shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
+              if os.path.exists("keystores/jaknooma-key.jks"):
+                  shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
               
               with open(gradle_path, "r") as f:
                   gradle_content = f.read()
@@ -61,7 +57,7 @@ workflows:
                   gradle_content = gradle_content.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
                   with open(gradle_path, "w") as f:
                       f.write(gradle_content)
-          '
+          EOF
       - name: Build Android App Bundle (AAB)
         script: |
           cd android
