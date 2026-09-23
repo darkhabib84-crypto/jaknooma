@@ -10,13 +10,24 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Initialize Capacitor Android, Set API & Sign
+      - name: Auto-Generate Keystore, Set API & Sign
         script: |
           npx cap add android
           npx cap sync android
+          
+          # إنشاء مجلد للشهادات إذا لم يكن موجوداً
+          mkdir -p keystores
+          
+          # توليد ملف Keystore افتراضي سحابياً إذا لم يكن موجوداً
+          KEYSTORE_PATH="keystores/jaknooma-key.jks"
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            keytool -genkey -v -keystore "$KEYSTORE_PATH" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
+          fi
+          
+          # تحديث الـ SDK وحقن التوقيع تلقائياً عبر بايثون
           python3 -c '
-          import re, os
-
+          import re, os, shutil
+          
           var_path = "android/variables.gradle"
           if os.path.exists(var_path):
               with open(var_path, "r") as f:
@@ -28,13 +39,24 @@ workflows:
                   f.write(content)
 
           gradle_path = "android/app/build.gradle"
-          keystore_path = os.environ.get("CM_KEYSTORE_PATH", "")
-          if os.path.exists(gradle_path) and keystore_path:
+          if os.path.exists(gradle_path):
+              # نسخ مفتاح Keystore إلى مجلد المشروع الداخلي
+              shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
+              
               with open(gradle_path, "r") as f:
                   gradle_content = f.read()
               
               if "signingConfigs" not in gradle_content:
-                  signing_block = "\n    signingConfigs {\n        release {\n            storeFile file(\"" + keystore_path + "\")\n            storePassword \"" + os.environ.get("CM_KEYSTORE_PASSWORD", "") + "\"\n            keyAlias \"" + os.environ.get("CM_KEYSTORE_ALIAS", "") + "\"\n            keyPassword \"" + os.environ.get("CM_KEYSTORE_PRIVATE_KEY_PASSWORD", "") + "\"\n        }\n    }\n"
+                  signing_block = """
+    signingConfigs {
+        release {
+            storeFile file("jaknooma-key.jks")
+            storePassword "jaknooma123456"
+            keyAlias "jaknooma-alias"
+            keyPassword "jaknooma123456"
+        }
+    }
+                  """
                   gradle_content = gradle_content.replace("android {", "android {" + signing_block, 1)
                   gradle_content = gradle_content.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
                   with open(gradle_path, "w") as f:
@@ -47,6 +69,7 @@ workflows:
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
       - android/app/build/outputs/apk/release/*.apk
+      - keystores/*.jks
 
   jaknooma-ios-workflow:
     name: Build Jaknooma iOS App
