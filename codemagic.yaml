@@ -17,18 +17,20 @@ workflows:
           else
             npx cap sync android
           fi
-      - name: Generate Keystore
+      - name: Generate Fixed Keystore & Export Certificate
         script: |
           mkdir -p keystores
+          # توليد مفتاح ثابت وثابت بكلمة مرور ومعلومات دقيقة لكي لا يتغير أبداً
           if [ ! -f "keystores/jaknooma-key.jks" ]; then
             keytool -genkey -v -keystore "keystores/jaknooma-key.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
           fi
+          # استخراج ملف الشهادة .pem لتقديمه لجوجل
+          keytool -export -rfc -keystore "keystores/jaknooma-key.jks" -alias jaknooma-alias -storepass "jaknooma123456" -file "keystores/upload_certificate.pem"
       - name: Update SDK & Configure Signing Properly
         script: |
           python3 -c '
           import os, shutil, re
 
-          # 1. تحديث متغيرات SDK في variables.gradle
           var_path = "android/variables.gradle"
           if os.path.exists(var_path):
               with open(var_path, "r") as f:
@@ -38,29 +40,24 @@ workflows:
               c = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", c)
               open(var_path, "w").write(c)
 
-          # 2. نسخ مفتاح التوقيع
           if os.path.exists("keystores/jaknooma-key.jks"):
               shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
 
-          # 3. إعداد التوقيع و SDK في app/build.gradle بدقة
           gp = "android/app/build.gradle"
           if os.path.exists(gp):
               with open(gp, "r") as f:
                   c = f.read()
               
-              # ضمان وجود compileSdkVersion إذا لم يكن موجوداً
               if "compileSdkVersion" not in c and "compileSdk " not in c:
                   c = c.replace("android {", "android {\n    compileSdkVersion 36\n    defaultConfig {\n        targetSdkVersion 36\n    }\n", 1)
 
               lb = chr(123)
               rb = chr(125)
 
-              # إضافة signingConfigs إذا لم تكن موجودة
               if "signingConfigs" not in c:
                   signing_block = "\n    signingConfigs " + lb + "\n        release " + lb + "\n            storeFile file(\"jaknooma-key.jks\")\n            storePassword \"jaknooma123456\"\n            keyAlias \"jaknooma-alias\"\n            keyPassword \"jaknooma123456\"\n        " + rb + "\n    " + rb + "\n"
                   c = c.replace("android " + lb, "android " + lb + signing_block, 1)
 
-              # إضافة signingConfig داخل release buildTypes
               if "signingConfig signingConfigs.release" not in c:
                   c = re.sub(r"(buildTypes\s*" + lb + r"[^}]*release\s*" + lb + r")", r"\1\n            signingConfig signingConfigs.release", c, flags=re.DOTALL)
 
@@ -72,8 +69,7 @@ workflows:
           ./gradlew bundleRelease
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
-      - android/app/build/outputs/apk/release/*.apk
-      - keystores/*.jks
+      - keystores/upload_certificate.pem
 
   jaknooma-ios-workflow:
     name: Build Jaknooma iOS App
