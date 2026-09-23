@@ -10,9 +10,8 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Initialize Capacitor Android
+      - name: Sync Capacitor Android
         script: |
-          npx cap add android
           npx cap sync android
       - name: Generate Keystore
         script: |
@@ -20,8 +19,47 @@ workflows:
           if [ ! -f "keystores/jaknooma-key.jks" ]; then
             keytool -genkey -v -keystore "keystores/jaknooma-key.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
           fi
-      - name: Update SDK & Configure Signing
-        script: python3 -c 'import re, os, shutil; [open(f, "w").write(re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", open(f).read())))) for f in ["android/variables.gradle", "android/build.gradle"] if os.path.exists(f)]; os.path.exists("keystores/jaknooma-key.jks") and shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks"); gp = "android/app/build.gradle"; content = open(gp).read() if os.path.exists(gp) else ""; "signingConfigs" not in content and open(gp, "w").write(content.replace("android {", "android {\n    signingConfigs {\n        release {\n            storeFile file(\"jaknooma-key.jks\")\n            storePassword \"jaknooma123456\"\n            keyAlias \"jaknooma-alias\"\n            keyPassword \"jaknooma123456\"\n        }\n    }\n", 1).replace("release {", "release {\n            signingConfig signingConfigs.release", 1))'
+      - name: Update SDK & Configure Signing Safely
+        script: |
+          python3 -c '
+          import os, shutil, re
+
+          # 1. تحديث متغيرات SDK بأمان في variables.gradle
+          var_path = "android/variables.gradle"
+          if os.path.exists(var_path):
+              with open(var_path, "r") as f:
+                  content = f.read()
+              content = re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", content)
+              content = re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", content)
+              content = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", content)
+              with open(var_path, "w") as f:
+                  f.write(content)
+
+          # 2. نسخ مفتاح التوقيع وحقنه في app/build.gradle بأمان
+          if os.path.exists("keystores/jaknooma-key.jks"):
+              shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
+
+          app_gradle = "android/app/build.gradle"
+          if os.path.exists(app_gradle):
+              with open(app_gradle, "r") as f:
+                  code = f.read()
+              
+              if "signingConfigs" not in code:
+                  signing_block = """
+    signingConfigs {
+        release {
+            storeFile file("jaknooma-key.jks")
+            storePassword "jaknooma123456"
+            keyAlias "jaknooma-alias"
+            keyPassword "jaknooma123456"
+        }
+    }
+                  """
+                  code = code.replace("android {", "android {" + signing_block, 1)
+                  code = code.replace("release {", "release {\n            signingConfig signingConfigs.release", 1)
+                  with open(app_gradle, "w") as f:
+                      f.write(code)
+          '
       - name: Build Android App Bundle (AAB)
         script: |
           cd android
