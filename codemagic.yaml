@@ -1,79 +1,54 @@
-workflows:
-  jaknooma-android-workflow:
-    name: Build Jaknooma Android App
-    instance_type: mac_mini_m1
-    environment:
-      node: lts
-      java: 17
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Build web app
-        script: npm run build
-      - name: Setup Capacitor Android
-        script: |
-          if [ ! -d "android" ]; then
-            npx cap add android
-          else
-            npx cap sync android
-          fi
-      - name: Generate Keystore
-        script: |
-          mkdir -p keystores
-          if [ ! -f "keystores/jaknooma-key.jks" ]; then
-            keytool -genkey -v -keystore "keystores/jaknooma-key.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
-          fi
-      - name: Update SDK & Configure Signing Safely
-        script: |
-          python3 -c '
-          import os, shutil, re
-          for f in ["android/variables.gradle", "android/build.gradle"]:
-              if os.path.exists(f):
-                  c = open(f).read()
-                  c = re.sub(r"minSdkVersion\s*=\s*\d+", "minSdkVersion = 24", c)
-                  c = re.sub(r"compileSdkVersion\s*=\s*\d+", "compileSdkVersion = 36", c)
-                  c = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", c)
-                  open(f, "w").write(c)
+#!/usr/bin/env bash
 
-          if os.path.exists("keystores/jaknooma-key.jks"):
-              shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
+cd android
+./gradlew bundleRelease
+Showing the last 50 lines. Click this button to load the full log
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
 
-          gp = "android/app/build.gradle"
-          if os.path.exists(gp):
-              c = open(gp).read()
-              if "signingConfigs" not in c:
-                  lb = chr(123)
-                  rb = chr(125)
-                  sb = "\n    signingConfigs " + lb + "\n        release " + lb + "\n            storeFile file(\"jaknooma-key.jks\")\n            storePassword \"jaknooma123456\"\n            keyAlias \"jaknooma-alias\"\n            keyPassword \"jaknooma123456\"\n        " + rb + "\n    " + rb + "\n"
-                  c = c.replace("android " + lb, "android " + lb + sb, 1)
-                  c = c.replace("release " + lb, "release " + lb + "\n            signingConfig signingConfigs.release", 1)
-                  open(gp, "w").write(c)
-          '
-      - name: Build Android App Bundle (AAB)
-        script: |
-          cd android
-          ./gradlew bundleRelease
-    artifacts:
-      - android/app/build/outputs/bundle/release/*.aab
-      - android/app/build/outputs/apk/release/*.apk
-      - keystores/*.jks
+BUILD FAILED in 492ms
 
-  jaknooma-ios-workflow:
-    name: Build Jaknooma iOS App
-    instance_type: mac_mini_m1
-    environment:
-      node: lts
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Build web app
-        script: npm run build
-      - name: Initialize Capacitor iOS
-        script: |
-          npx cap add ios
-          npx cap sync ios
-      - name: Install CocoaPods
-        script: |
-          cd ios/App && pod install
+
+Build failed :|
+Step 7 script `Build Android App Bundle (AAB)` exited with status code 1
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* Where:
+Build file '/Users/builder/clone/android/app/build.gradle' line: 6
+
+* What went wrong:
+A problem occurred evaluating project ':app'.
+> Could not find method signingConfig() for arguments [SigningConfig$AgpDecorated_Decorated{name=release, storeFile=null, storePassword=null, keyAlias=null, keyPassword=null, storeType=pkcs12, v1SigningEnabled=true, v2SigningEnabled=true, enableV1Signing=null, enableV2Signing=null, enableV3Signing=null, enableV4Signing=null}] on SigningConfig$AgpDecorated_Decorated{name=release, storeFile=null, storePassword=null, keyAlias=null, keyPassword=null, storeType=pkcs12, v1SigningEnabled=true, v2SigningEnabled=true, enableV1Signing=null, enableV2Signing=null, enableV3Signing=null, enableV4Signing=null} of type com.android.build.gradle.internal.dsl.SigningConfig$AgpDecorated.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+A problem occurred configuring project ':app'.
+> compileSdkVersion is not specified. Please add it to build.gradle
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+BUILD FAILED in 492ms
+
+
+Build failed :|
+Step 7 script `Build Android App Bundle (AAB)` exited with status code 1
