@@ -86,9 +86,9 @@ function AppContent() {
         {/* المسارات الرئيسية مع الـ Layout */}
         <Route element={<MainLayout />}>
           <Route path="/" element={
-            <div className="flex flex-1 min-h-screen relative">
+            <div className="flex flex-col md:flex-row flex-1 min-h-screen relative w-full overflow-x-hidden">
               <Sidebar />
-              <main className="flex-1 flex flex-col w-full relative z-0 outline-none">
+              <main className="flex-1 flex flex-col w-full relative z-0 outline-none min-w-0">
                 <Breadcrumbs />
                 <ProductGrid />
                 <Footer />
