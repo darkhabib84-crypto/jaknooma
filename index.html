@@ -1,26 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>jaknooma | Premium Modern Marketplace</title>
-    <meta name="description" content="Discover premium, curated products for modern living. Fast shipping, exceptional quality, and seamless shopping experience." />
-    <meta name="keywords" content="marketplace, premium, luxury, modern, shopping, jaknooma" />
-    <meta property="og:title" content="jaknooma | Premium Modern Marketplace" />
-    <meta property="og:description" content="Discover premium, curated products for modern living." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jaknooma | منصة التسوق الذكي وعروض المتاجر العالمية</title>
+    <meta name="description" content="منصة جكنومة تجمع لك أفضل المنتجات وعروض التسوق بالعمولة من أشهر المتاجر العالمية والمحلية، بالإضافة إلى الإعلانات المباشرة لتجربة تسوق ذكية وسريعة." />
+    <meta name="keywords" content="marketplace, affiliate, shopping, deals, amazon, shein, temu, aliexpress, jaknooma, تسوق, عروض, عمولة" />
+    <meta property="og:title" content="jaknooma | منصة التسوق الذكي وعروض المتاجر" />
+    <meta property="og:description" content="اكتشف وتصفح أفضل المنتجات والعروض من المتاجر الكبرى في مكان واحد." />
     <meta property="og:type" content="website" />
     <meta name="theme-color" content="#1A1A1A" />
     <link rel="canonical" href="https://www.jaknooma.com" />
     
     <style>
-      /* الحل الجذري لمنع التظليل الذي يظهر عند مرور الماوس */
-      body, html {
+      /* ضبط التحجيم الديناميكي ومنع مشاكل العرض على الجوال */
+      html, body {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        box-sizing: border-box;
         -webkit-user-select: none !important;
         -moz-user-select: none !important;
         -ms-user-select: none !important;
         user-select: none !important;
         -webkit-tap-highlight-color: transparent !important;
         touch-action: manipulation;
+        margin: 0;
+        padding: 0;
+      }
+      
+      *, *:before, *:after {
+        box-sizing: inherit;
       }
       
       /* السماح بالكتابة فقط في حقول الإدخال */
@@ -29,7 +39,7 @@
         user-select: text !important;
       }
 
-      /* منع سكرول الصفحة عند فتح القوائم */
+      /* منع سكرول الصفحة عند فتح القوائم الجانبية أو المودال */
       body.overflow-hidden {
         overflow: hidden;
       }
@@ -40,5 +50,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
-      
