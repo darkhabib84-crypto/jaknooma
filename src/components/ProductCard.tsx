@@ -39,7 +39,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discount = product.discountPercent || 0;
   const originalPrice = Number(product.originalPrice || product.price || 0);
   const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : Number(product.price || 0);
-  const currencySymbol = product.currency || 'AED';
+  
+  // معالجة آمنة لرمز العملة (يأخذ عملة المنتج أو افتراضياً AED)
+  const currencySymbol = product.currency ? product.currency.trim() : 'AED';
+  
   const productName = product.name || product.title || 'منتج بدون عنوان';
 
   // معالجة آمنة للصور
@@ -76,18 +79,17 @@ export default function ProductCard({ product }: ProductCardProps) {
     return path.startsWith('/') ? `${base}${path.slice(1)}` : `${base}${path}`;
   };
 
-  // محتوى البطاقة مدمج بشكل مباشر ونظيف لتجنب أخطاء إعادة الرسم
   const cardBody = (
     <div className="w-full flex flex-col box-border">
       {/* حاوية الصور */}
-      <div className="relative w-full pt-[110%] sm:pt-[120%] bg-[#F5F5F0] rounded-2xl mb-2.5 overflow-hidden">
+      <div className="relative w-full pt-[110%] sm:pt-[120%] bg-[#F5F5F0] rounded-xl sm:rounded-2xl mb-2.5 overflow-hidden">
         {!isExternal && (
           <div className="absolute top-2.5 left-2.5 z-30 flex flex-col gap-1">
             {product.isVIP && (
               <img 
                 src={resolveBadgePath('images/jaknooma-vip.png')} 
                 alt="VIP" 
-                className="w-8 h-auto" 
+                className="w-7 sm:w-8 h-auto" 
                 onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
               />
             )}
@@ -95,7 +97,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <img 
                 src={resolveBadgePath('images/jaknooma-10.png')} 
                 alt="Gold" 
-                className="w-8 h-auto" 
+                className="w-7 sm:w-8 h-auto" 
                 onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} 
               />
             )}
@@ -103,7 +105,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <img 
                 src={resolveBadgePath('images/jaknooma-5.png')} 
                 alt="Silver" 
-                className="w-8 h-auto" 
+                className="w-7 sm:w-8 h-auto" 
                 onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} 
               />
             )}
@@ -111,7 +113,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {isExternal && (
-          <span className="absolute top-2.5 right-2.5 z-30 px-2.5 py-1 bg-black/85 backdrop-blur-sm text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
+          <span className="absolute top-2.5 right-2.5 z-30 px-2 py-0.5 bg-black/85 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
             {product.storeName || 'خارجي'}
           </span>
         )}
@@ -126,17 +128,20 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
-            <ImageOff size={20} />
-            <span className="text-[10px]">لا توجد صورة</span>
+            <ImageOff size={18} />
+            <span className="text-[9px]">لا توجد صورة</span>
           </div>
         )}
       </div>
 
       {/* تفاصيل المنتج */}
-      <div className="flex flex-col px-1.5 pb-1">
-        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[36px] mb-1.5 leading-snug">{productName}</h3>
+      <div className="flex flex-col px-1 pb-1 w-full min-w-0">
+        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[34px] sm:min-h-[38px] mb-1 leading-snug break-words">
+          {productName}
+        </h3>
         
-        <div className="flex items-center gap-1.5 mb-2">
+        {/* السعر والعملة بشكل صحيح */}
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           {discount > 0 ? (
             <>
               <span className="text-xs sm:text-sm font-bold text-red-600">
@@ -148,15 +153,15 @@ export default function ProductCard({ product }: ProductCardProps) {
             </>
           ) : (
             <span className="text-xs sm:text-sm font-bold text-gray-900">
-              {finalPrice > 0 ? `${finalPrice.toFixed(2)} {currencySymbol}` : 'شاهد السعر بالمتجر'}
+              {finalPrice > 0 ? `${finalPrice.toFixed(2)} ${currencySymbol}` : 'شاهد السعر'}
             </span>
           )}
         </div>
 
-        <div className="pt-2 border-t border-gray-100 flex flex-col gap-1.5 text-[11px] text-gray-500">
-          <div className="flex items-center gap-1">
-            <User size={12} className="text-gray-400 shrink-0" />
-            <span className="truncate">
+        <div className="pt-2 border-t border-gray-100 flex flex-col gap-1.5 text-[10px] sm:text-[11px] text-gray-500 w-full min-w-0">
+          <div className="flex items-center gap-1 w-full min-w-0">
+            <User size={11} className="text-gray-400 shrink-0" />
+            <span className="truncate w-full">
               {isExternal ? 'المتجر: ' : 'Seller: '}
               <strong className="text-gray-700 font-medium">
                 {product.sellerName || product.storeName || 'Anonymous'}
@@ -164,23 +169,23 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
-            <MapPin size={12} className="text-gray-400 shrink-0" />
-            <span className="truncate">
+          <div className="flex items-center gap-1 w-full min-w-0">
+            <MapPin size={11} className="text-gray-400 shrink-0" />
+            <span className="truncate w-full">
               Loc: <strong className="text-gray-700 font-medium">{product.location || (isExternal ? 'شحن دولي' : 'Not specified')}</strong>
             </span>
           </div>
 
           {isExternal ? (
-            <div className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-black hover:bg-gray-800 text-white rounded-xl font-semibold text-xs transition-colors shadow-xs">
-              <ShoppingBag size={13} className="text-[#D4AF37]" />
+            <div className="mt-1.5 w-full flex items-center justify-center gap-1 py-1.5 px-2 bg-black hover:bg-gray-800 text-white rounded-xl font-semibold text-[11px] transition-colors shadow-xs">
+              <ShoppingBag size={11} className="text-[#D4AF37] shrink-0" />
               <span className="truncate">شراء من {product.storeName || 'المتجر'}</span>
-              <ExternalLink size={12} className="shrink-0 ml-0.5" />
+              <ExternalLink size={10} className="shrink-0 ml-0.5" />
             </div>
           ) : (
-            <div className="flex items-center gap-1 mt-1">
-              <Calendar size={12} className="text-gray-400 shrink-0" />
-              <span>
+            <div className="flex items-center gap-1 mt-0.5 w-full min-w-0">
+              <Calendar size={11} className="text-gray-400 shrink-0" />
+              <span className="truncate">
                 Posted: <strong className="text-gray-700 font-medium">{formatDate(product.createdAt)}</strong>
               </span>
             </div>
@@ -191,7 +196,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   );
 
   return (
-    <div className="group flex flex-col relative w-full bg-white rounded-2xl p-2.5 shadow-sm border border-gray-100 hover:shadow-md transition-all">
+    <div className="group flex flex-col relative w-full bg-white rounded-2xl p-2 sm:p-2.5 shadow-sm border border-gray-100 hover:shadow-md transition-all box-border">
       {isExternal ? (
         <a 
           href={product.externalUrl || '#'} 
@@ -216,7 +221,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50">
-        <ImageOff size={20} />
+        <ImageOff size={18} />
         <span className="text-[9px]">غير متوفرة</span>
       </div>
     );
