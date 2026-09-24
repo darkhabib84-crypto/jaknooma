@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductCard, { Product } from './ProductCard';
-import SponsoredAdSlot from './SponsoredAdSlot'; // استدعاء مكون الإعلانات الذي أنشأناه
+import SponsoredAdSlot from './SponsoredAdSlot';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
@@ -172,11 +172,11 @@ export default function ProductGrid() {
   return (
     <div className="flex-1 px-3 sm:px-8 lg:px-12 py-6 mx-auto w-full max-w-[1400px]">
       
-      {/* بانر إعلاني مميز في أعلى الصفحة (Hero Ad Placement) */}
+      {/* بانر إعلاني مميز في أعلى الصفحة */}
       <div className="mb-8">
         <SponsoredAdSlot 
           placement="hero" 
-          adData={null} // اتركها null لتعرض زر "ضع إعلانك هنا" الجذاب أو اربطها بإعلان من قاعدة البيانات
+          adData={null} 
           onBookClick={() => alert('سيتم فتح صفحة حجز الإعلان قريباً')} 
         />
       </div>
@@ -217,7 +217,7 @@ export default function ProductGrid() {
                 <ProductCard product={product} />
               </motion.div>
 
-              {/* دمج إعلان شبكي (Grid Ad) بعد كل 8 منتجات لزيادة الأرباح بدون إزعاج */}
+              {/* إعلان شبكي بعد المنتج الثامن */}
               {index === 7 && (
                 <div className="col-span-2">
                   <SponsoredAdSlot 
