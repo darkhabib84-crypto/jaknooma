@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductCard, { Product } from './ProductCard';
-import SponsoredAdSlot from './SponsoredAdSlot';
 import { collection, query, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
@@ -172,15 +171,6 @@ export default function ProductGrid() {
   return (
     <div className="flex-1 px-3 sm:px-8 lg:px-12 py-6 mx-auto w-full max-w-[1400px]">
       
-      {/* بانر إعلاني مميز في أعلى الصفحة */}
-      <div className="mb-8">
-        <SponsoredAdSlot 
-          placement="hero" 
-          adData={null} 
-          onBookClick={() => alert('سيتم فتح صفحة حجز الإعلان قريباً')} 
-        />
-      </div>
-
       {image.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {image.map((item) => (
@@ -211,23 +201,10 @@ export default function ProductGrid() {
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.03 } } }}
           className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-6 sm:gap-x-6 sm:gap-y-10"
         >
-          {filteredProducts.slice(0, visibleCount).map((product, index) => (
-            <React.Fragment key={product.id || product.title}>
-              <motion.div variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }}>
-                <ProductCard product={product} />
-              </motion.div>
-
-              {/* إعلان شبكي بعد المنتج الثامن */}
-              {index === 7 && (
-                <div className="col-span-2">
-                  <SponsoredAdSlot 
-                    placement="grid" 
-                    adData={null} 
-                    onBookClick={() => alert('حجز إعلان في شبكة المنتجات')}
-                  />
-                </div>
-              )}
-            </React.Fragment>
+          {filteredProducts.slice(0, visibleCount).map((product) => (
+            <motion.div key={product.id || product.title} variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }}>
+              <ProductCard product={product} />
+            </motion.div>
           ))}
         </motion.div>
       )}
