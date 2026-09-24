@@ -31,7 +31,6 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
 
-  // 1. جلب تفاصيل المنتج
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
@@ -49,7 +48,6 @@ const ProductDetails = () => {
     fetchProduct();
   }, [id]);
 
-  // 2. جلب بيانات البائع فقط لزر التوجيه
   useEffect(() => {
     if (!product) return;
     const sellerIdentifier = product.storeId || product.sellerId;
@@ -137,43 +135,47 @@ const ProductDetails = () => {
       </div>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 p-4 sm:p-6 md:p-10 outline-none border-none min-w-0 flex flex-col items-center" dir="rtl">
-        <div className="w-full max-w-6xl">
+      <main className="flex-1 p-3 sm:p-6 md:p-10 outline-none border-none min-w-0 flex flex-col items-center overflow-x-hidden w-full" dir="rtl">
+        <div className="w-full max-w-6xl mx-auto box-border">
           <button 
             onClick={() => navigate(-1)} 
-            className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium group"
+            className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium group cursor-pointer"
           >
             <ArrowLeft size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" /> 
             العودة للتسوق
           </button>
 
-          <div className="grid lg:grid-cols-2 gap-10 w-full mx-auto">
-            {/* معرض الصور */}
-            <div className="w-full">
-              <Swiper navigation={true} modules={[Navigation]} className="h-[380px] md:h-[450px] w-full rounded-3xl bg-gray-50 shadow-inner border border-gray-100">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-10 w-full mx-auto">
+            {/* معرض الصور - تم تقييد العرض ومنع الخروج عن الشاشة */}
+            <div className="w-full min-w-0 overflow-hidden">
+              <Swiper 
+                navigation={true} 
+                modules={[Navigation]} 
+                className="h-[300px] sm:h-[380px] md:h-[450px] w-full max-w-full rounded-3xl bg-gray-50 shadow-inner border border-gray-100"
+              >
                 {images.map((img: string, i: number) => (
-                  <SwiperSlide key={i} className="flex items-center justify-center p-4">
-                    <img src={img} className="max-w-full max-h-full object-contain rounded-2xl" alt={product.name} />
+                  <SwiperSlide key={i} className="flex items-center justify-center p-4 w-full h-full">
+                    <img src={img} className="max-w-full max-h-full object-contain rounded-2xl" alt={product.name || 'Product'} />
                   </SwiperSlide>
                 ))}
               </Swiper>
             </div>
 
             {/* تفاصيل المنتج والمعلومات */}
-            <div className="flex flex-col justify-between">
+            <div className="flex flex-col justify-between min-w-0 w-full">
               <div>
-                <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-3 leading-tight">{product.name}</h1>
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 mb-3 leading-tight break-words">{product.name}</h1>
                 <div className="flex items-baseline gap-2 mb-6">
-                  <span className="text-3xl font-extrabold text-green-600">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-green-600">
                     {product.price} {currencySymbol}
                   </span>
                 </div>
 
                 {/* بطاقة معلومات سريعة عن البائع والموقع */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-2xl mb-6 border border-gray-100 w-full box-border">
                   
                   {/* اسم البائع ورابط الانتقال لصفحته */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     {sellerAvatar ? (
                       <img src={sellerAvatar} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-gray-200" alt={sellerName} />
                     ) : (
@@ -181,31 +183,31 @@ const ProductDetails = () => {
                         <User size={18} />
                       </div>
                     )}
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <span className="block text-[10px] text-gray-400 font-medium">البائع</span>
                       {targetSellerId ? (
                         <button
                           onClick={() => navigate(`/store/${targetSellerId}`)}
-                          className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors group text-right w-full"
+                          className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-blue-600 transition-colors group text-right w-full cursor-pointer"
                         >
-                          <span className="truncate">{sellerName}</span>
+                          <span className="truncate w-full">{sellerName}</span>
                           <ChevronLeft size={14} className="text-gray-400 group-hover:text-blue-600 transition-transform group-hover:-translate-x-0.5 shrink-0" />
                         </button>
                       ) : (
-                        <span className="text-sm font-bold text-gray-700 truncate block">{sellerName}</span>
+                        <span className="text-sm font-bold text-gray-700 truncate block w-full">{sellerName}</span>
                       )}
                     </div>
                   </div>
 
                   {/* رقم التواصل */}
                   {sellerPhone && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
                         <Phone size={18} />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <span className="block text-[10px] text-gray-400 font-medium">رقم التواصل</span>
-                        <a href={`tel:${sellerPhone}`} className="text-sm font-bold text-gray-700 hover:text-emerald-600 dir-ltr block">
+                        <a href={`tel:${sellerPhone}`} className="text-sm font-bold text-gray-700 hover:text-emerald-600 dir-ltr block truncate">
                           {sellerPhone}
                         </a>
                       </div>
@@ -213,11 +215,11 @@ const ProductDetails = () => {
                   )}
 
                   {/* موقع الإعلان */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="p-2.5 bg-red-50 text-red-600 rounded-xl shrink-0">
                       <MapPin size={18} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="block text-[10px] text-gray-400 font-medium">الموقع</span>
                       <span className="text-sm font-bold text-gray-700 block truncate">
                         {product.location || 'غير محدد'}
@@ -226,13 +228,13 @@ const ProductDetails = () => {
                   </div>
 
                   {/* تاريخ الإعلان */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl shrink-0">
                       <Calendar size={18} />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <span className="block text-[10px] text-gray-400 font-medium">تاريخ الإعلان</span>
-                      <span className="text-sm font-bold text-gray-700 block">
+                      <span className="text-sm font-bold text-gray-700 block truncate">
                         {formatDate(product.createdAt)}
                       </span>
                     </div>
@@ -240,18 +242,18 @@ const ProductDetails = () => {
                 </div>
 
                 {/* وصف المنتج */}
-                <div className="mb-8">
+                <div className="mb-8 w-full">
                   <h3 className="text-sm font-bold text-gray-400 mb-2">الوصف</h3>
-                  <p className="text-gray-700 leading-relaxed text-base whitespace-pre-line">{product.description || 'لا يوجد وصف متوفر لهذا المنتج.'}</p>
+                  <p className="text-gray-700 leading-relaxed text-sm sm:text-base whitespace-pre-line break-words">{product.description || 'لا يوجد وصف متوفر لهذا المنتج.'}</p>
                 </div>
               </div>
               
               {/* أزرار الشراء والتفاعل */}
-              <div className="flex flex-col gap-3 pt-4 border-t border-gray-100">
+              <div className="flex flex-col gap-3 pt-4 border-t border-gray-100 w-full">
                 {targetBuyUrl && (
                   <button 
                     onClick={() => window.open(targetBuyUrl, '_blank')} 
-                    className="flex items-center justify-center gap-3 w-full py-4 bg-black text-white rounded-2xl font-bold text-lg hover:bg-gray-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
+                    className="flex items-center justify-center gap-3 w-full py-3.5 sm:py-4 bg-black text-white rounded-2xl font-bold text-base sm:text-lg hover:bg-gray-800 transition-all shadow-lg active:scale-[0.98] cursor-pointer"
                   >
                     <ExternalLink size={20} /> شراء الآن من المتجر
                   </button>
@@ -259,7 +261,7 @@ const ProductDetails = () => {
 
                 <button 
                   onClick={() => addToCart(product)}
-                  className="flex items-center justify-center gap-3 w-full py-4 border-2 border-gray-900 text-gray-900 rounded-2xl font-bold text-lg hover:bg-gray-900 hover:text-white transition-all active:scale-[0.98] cursor-pointer"
+                  className="flex items-center justify-center gap-3 w-full py-3.5 sm:py-4 border-2 border-gray-900 text-gray-900 rounded-2xl font-bold text-base sm:text-lg hover:bg-gray-900 hover:text-white transition-all active:scale-[0.98] cursor-pointer"
                 >
                   <ShoppingCart size={20} /> إضافة للسلة
                 </button>
@@ -275,10 +277,10 @@ const ProductDetails = () => {
           </div>
 
           {/* كارت التوجيه الحصري لصفحة البائع الكاملة */}
-          <div className="mt-16 w-full border-t border-gray-100 pt-10">
-            <div className="p-8 bg-gray-50 rounded-3xl border border-gray-100 text-center flex flex-col items-center">
+          <div className="mt-16 w-full border-t border-gray-100 pt-10 box-border">
+            <div className="p-6 sm:p-8 bg-gray-50 rounded-3xl border border-gray-100 text-center flex flex-col items-center w-full box-border">
               <Store size={40} className="text-gray-400 mb-3" />
-              <h3 className="text-xl font-bold text-gray-900 mb-1">متجر {sellerName}</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">متجر {sellerName}</h3>
               
               <div className="flex justify-center items-center gap-1 text-amber-400 mb-3">
                 <Star size={18} fill="currentColor" />
@@ -288,14 +290,14 @@ const ProductDetails = () => {
                 <Star size={18} fill="currentColor" />
               </div>
 
-              <p className="text-gray-600 text-sm max-w-md mb-6">
+              <p className="text-gray-600 text-xs sm:text-sm max-w-md mb-6">
                 للإطلاع على جميع منتجات التاجر الأخرى، التقييمات، ومعلومات التواصل كاملة، يمكنك زيارة بروفايل البائع المخصص.
               </p>
 
               {targetSellerId && (
                 <button
                   onClick={() => navigate(`/store/${targetSellerId}`)}
-                  className="flex items-center gap-2 px-8 py-3 bg-black text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors shadow-md active:scale-95 cursor-pointer"
+                  className="flex items-center gap-2 px-6 sm:px-8 py-3 bg-black text-white text-xs sm:text-sm font-bold rounded-xl hover:bg-gray-800 transition-colors shadow-md active:scale-95 cursor-pointer"
                 >
                   الانتقال لصفحة البائع والتقييمات
                   <ChevronLeft size={16} />
