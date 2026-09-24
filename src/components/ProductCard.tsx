@@ -89,14 +89,15 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   const CardContent = () => (
     <>
-      <div className="relative w-full pt-[125%] bg-[#F5F5F0] rounded-3xl mb-4 overflow-hidden">
+      {/* حاوية الصورة أصبحت أصغر وأكثر تناسقاً بالجوال */}
+      <div className="relative w-full pt-[110%] sm:pt-[120%] bg-[#F5F5F0] rounded-2xl mb-2.5 overflow-hidden">
         {!isExternal && (
-          <div className="absolute top-3 left-3 z-30 flex flex-col gap-1">
+          <div className="absolute top-2.5 left-2.5 z-30 flex flex-col gap-1">
             {product.isVIP && (
               <img 
                 src={resolveBadgePath('images/jaknooma-vip.png')} 
                 alt="VIP" 
-                className="w-10 h-auto" 
+                className="w-8 h-auto" 
                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
               />
             )}
@@ -104,7 +105,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <img 
                 src={resolveBadgePath('images/jaknooma-10.png')} 
                 alt="Gold" 
-                className="w-10 h-auto" 
+                className="w-8 h-auto" 
                 onError={(e) => { e.currentTarget.style.display = 'none'; }} 
               />
             )}
@@ -112,7 +113,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <img 
                 src={resolveBadgePath('images/jaknooma-5.png')} 
                 alt="Silver" 
-                className="w-10 h-auto" 
+                className="w-8 h-auto" 
                 onError={(e) => { e.currentTarget.style.display = 'none'; }} 
               />
             )}
@@ -120,7 +121,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         )}
 
         {isExternal && (
-          <span className="absolute top-3 right-3 z-30 px-3 py-1 bg-black text-white text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
+          <span className="absolute top-2.5 right-2.5 z-30 px-2.5 py-0.5 bg-black/80 backdrop-blur-sm text-white text-[9px] font-bold rounded-full uppercase tracking-wider shadow-sm">
             {product.storeName || 'خارجي'}
           </span>
         )}
@@ -135,35 +136,36 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
-            <ImageOff size={24} />
-            <span>لا توجد صورة متاحة</span>
+            <ImageOff size={20} />
+            <span className="text-[10px]">لا توجد صورة</span>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col px-2 mb-2">
-        <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 min-h-[40px] mb-1">{productName}</h3>
+      {/* تفاصيل المنتج مع تقليل المساحات الفارغة لتناسب شاشات الموبايل */}
+      <div className="flex flex-col px-1.5 pb-1">
+        <h3 className="text-xs sm:text-sm font-medium text-gray-900 line-clamp-2 min-h-[32px] mb-1 leading-snug">{productName}</h3>
         
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-1.5 mt-0.5">
           {discount > 0 ? (
             <>
-              <span className="text-sm font-bold text-red-600">
+              <span className="text-xs sm:text-sm font-bold text-red-600">
                 {finalPrice.toFixed(2)} {currencySymbol}
               </span>
-              <span className="text-[11px] text-gray-400 line-through">
+              <span className="text-[10px] text-gray-400 line-through">
                 {originalPrice.toFixed(2)} {currencySymbol}
               </span>
             </>
           ) : (
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="text-xs sm:text-sm font-bold text-gray-900">
               {finalPrice > 0 ? `${finalPrice.toFixed(2)} ${currencySymbol}` : 'شاهد السعر بالمتجر'}
             </span>
           )}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-[11px] text-gray-500">
-          <div className="flex items-center gap-1.5">
-            <User size={12} className="text-gray-400 shrink-0" />
+        <div className="mt-2.5 pt-2 border-t border-gray-100 flex flex-col gap-1 text-[10px] sm:text-[11px] text-gray-500">
+          <div className="flex items-center gap-1">
+            <User size={11} className="text-gray-400 shrink-0" />
             <span className="truncate">
               {isExternal ? 'المتجر: ' : 'Seller: '}
               <strong className="text-gray-700 font-medium">
@@ -172,21 +174,21 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <MapPin size={12} className="text-gray-400 shrink-0" />
+          <div className="flex items-center gap-1">
+            <MapPin size={11} className="text-gray-400 shrink-0" />
             <span className="truncate">
-              Location: <strong className="text-gray-700 font-medium">{product.location || (isExternal ? 'شحن دولي' : 'Not specified')}</strong>
+              Loc: <strong className="text-gray-700 font-medium">{product.location || (isExternal ? 'شحن دولي' : 'Not specified')}</strong>
             </span>
           </div>
 
           {isExternal ? (
-            <div className="flex items-center justify-between pt-1 text-black font-semibold text-xs group-hover:underline">
-              <span>شراء الآن من {product.storeName}</span>
-              <ExternalLink size={13} />
+            <div className="flex items-center justify-between pt-1 text-black font-semibold text-[11px] group-hover:text-[#D4AF37] transition-colors">
+              <span className="truncate">شراء من {product.storeName}</span>
+              <ExternalLink size={12} className="shrink-0" />
             </div>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <Calendar size={12} className="text-gray-400 shrink-0" />
+            <div className="flex items-center gap-1">
+              <Calendar size={11} className="text-gray-400 shrink-0" />
               <span>
                 Posted: <strong className="text-gray-700 font-medium">{formatDate(product.createdAt)}</strong>
               </span>
@@ -198,7 +200,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   );
 
   return (
-    <div className="group flex flex-col relative w-full bg-white rounded-3xl p-2 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+    <div className="group flex flex-col relative w-full bg-white rounded-2xl p-2 shadow-xs border border-gray-100/80 hover:shadow-md transition-all">
       {isExternal ? (
         <a 
           href={product.externalUrl || '#'} 
@@ -223,8 +225,8 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50">
-        <ImageOff size={22} />
-        <span className="text-[10px]">الصورة غير متوفرة</span>
+        <ImageOff size={20} />
+        <span className="text-[9px]">غير متوفرة</span>
       </div>
     );
   }
@@ -233,7 +235,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
     <img
       src={src}
       alt={alt}
-      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       onError={() => setHasError(true)}
     />
   );
