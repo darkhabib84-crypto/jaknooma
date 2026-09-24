@@ -1,6 +1,5 @@
 import { Search, Menu, X, Plus, Trash2, Home, Briefcase, Tv, Sofa, Shirt, Sparkles, Baby, Bike, Gamepad2, BookOpen, PawPrint, Wrench, Utensils, HeartPulse, Download, Users, LayoutGrid, ChevronDown, ChevronRight, Store, User } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useStores } from '../hooks/useStores';
 import { useUI } from '../contexts/UIContext';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useEffect, useState } from 'react';
@@ -12,7 +11,6 @@ import { Logo, LogoIcon } from './Logo';
 
 export default function Sidebar() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { stores, loadingStores } = useStores();
   const { isMobileMenuOpen, setMobileMenuOpen } = useUI();
   const { t, i18n } = useTranslation();
   const isAr = i18n.language === 'ar';
@@ -32,25 +30,12 @@ export default function Sidebar() {
 
   const currentCategory = searchParams.get('category') || '';
   const currentSub = searchParams.get('sub') || searchParams.get('brand') || '';
-  const currentMin = searchParams.get('minPrice') || '';
-  const currentMax = searchParams.get('maxPrice') || '';
-  const currentStore = searchParams.get('store');
 
   useEffect(() => {
     if (currentCategory) {
       setExpandedCategory(currentCategory);
     }
   }, [currentCategory]);
-
-  const handleStoreClick = (value: string) => {
-    if (value) {
-      searchParams.set('store', value);
-    } else {
-      searchParams.delete('store');
-    }
-    setSearchParams(searchParams);
-    setMobileMenuOpen(false);
-  };
 
   const handleCategoryClick = (value: string, hasSub: boolean) => {
     if (hasSub) {
@@ -66,6 +51,7 @@ export default function Sidebar() {
       searchParams.delete('sub');
       searchParams.delete('brand');
     }
+    searchParams.delete('store');
     setSearchParams(searchParams);
     
     if (!hasSub) {
@@ -78,15 +64,6 @@ export default function Sidebar() {
     searchParams.set('sub', sub);
     setSearchParams(searchParams);
     setMobileMenuOpen(false);
-  };
-
-  const handlePriceChange = (type: 'minPrice' | 'maxPrice', value: string) => {
-    if (value) {
-      searchParams.set(type, value);
-    } else {
-      searchParams.delete(type);
-    }
-    setSearchParams(searchParams);
   };
 
   // Admin Actions
@@ -208,17 +185,17 @@ export default function Sidebar() {
            <h3 className="text-xs font-bold uppercase tracking-widest text-[#D4AF37] mb-5 flex items-center justify-between">
             {t('Admin Panel')}
             <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse"></span>
-          </h3>
+           </h3>
           <ul className="space-y-4 text-sm">
              <li>
                <Link 
                   to="/admin/stores"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center w-full text-left rtl:text-right font-medium transition-all group p-3 rounded-xl bg-[#D4AF37]/5 text-[#D4AF37] hover:bg-[#D4AF37]/10"
-                >
+               >
                   <Store className="w-5 h-5 mr-3 rtl:ml-3 shrink-0" />
                   <span className="font-bold">{t('Store Management')}</span>
-                </Link>
+               </Link>
              </li>
           </ul>
         </div>
@@ -281,16 +258,16 @@ export default function Sidebar() {
                        return (
                        <li key={sub.en} className="flex items-center">
                          <button
-                           onClick={() => handleSubClick(category.value, subName)}
-                           className={`text-sm font-medium transition-colors flex-1 text-left rtl:text-right ${
-                              currentSub === subName ? 'text-black font-bold' : 'text-gray-500 hover:text-black'
-                           }`}
+                            onClick={() => handleSubClick(category.value, subName)}
+                            className={`text-sm font-medium transition-colors flex-1 text-left rtl:text-right ${
+                               currentSub === subName ? 'text-black font-bold' : 'text-gray-500 hover:text-black'
+                            }`}
                          >
-                           {subName}
+                            {subName}
                          </button>
                          {isAdmin && (
                             <button onClick={(e) => handleDeleteSubCategory(category.id, sub.en, e)} className="p-1 text-red-300 hover:text-red-600 transition-colors">
-                              <Trash2 className="w-3 h-3" />
+                               <Trash2 className="w-3 h-3" />
                             </button>
                          )}
                        </li>
@@ -300,16 +277,16 @@ export default function Sidebar() {
                       <li>
                         {addingSubTo === category.id ? (
                            <div className="flex flex-col gap-2 mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                             <input type="text" placeholder="EN Name" value={newSubEn} onChange={e => setNewSubEn(e.target.value)} className="text-xs p-1 border rounded w-full" />
-                             <input type="text" placeholder="AR Name" value={newSubAr} onChange={e => setNewSubAr(e.target.value)} className="text-xs p-1 border rounded w-full text-right" dir="rtl" />
-                             <div className="flex gap-2">
-                               <button onClick={() => handleAddSubCategory(category.id)} className="text-xs font-bold text-white bg-black px-2 py-1 rounded">Save</button>
-                               <button onClick={() => setAddingSubTo(null)} className="text-xs text-gray-500">Cancel</button>
-                             </div>
+                              <input type="text" placeholder="EN Name" value={newSubEn} onChange={e => setNewSubEn(e.target.value)} className="text-xs p-1 border rounded w-full" />
+                              <input type="text" placeholder="AR Name" value={newSubAr} onChange={e => setNewSubAr(e.target.value)} className="text-xs p-1 border rounded w-full text-right" dir="rtl" />
+                              <div className="flex gap-2">
+                                 <button onClick={() => handleAddSubCategory(category.id)} className="text-xs font-bold text-white bg-black px-2 py-1 rounded">Save</button>
+                                 <button onClick={() => setAddingSubTo(null)} className="text-xs text-gray-500">Cancel</button>
+                              </div>
                            </div>
                         ) : (
                            <button onClick={() => setAddingSubTo(category.id)} className="flex items-center text-xs text-[#D4AF37] font-bold hover:text-black transition-colors mt-2">
-                             <Plus className="w-3 h-3 mr-1 rtl:ml-1" /> Add Sub
+                              <Plus className="w-3 h-3 mr-1 rtl:ml-1" /> Add Sub
                            </button>
                         )}
                       </li>
@@ -325,100 +302,23 @@ export default function Sidebar() {
             <li>
                {isAddingCategory ? (
                  <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200 mt-2">
-                   <span className="text-xs font-bold text-gray-700">Add Category</span>
-                   <input type="text" placeholder="EN Name" value={newCatEn} onChange={e => setNewCatEn(e.target.value)} className="text-sm p-2 border rounded w-full" />
-                   <input type="text" placeholder="AR Name" value={newCatAr} onChange={e => setNewCatAr(e.target.value)} className="text-sm p-2 border rounded w-full text-right" dir="rtl" />
-                   <div className="flex gap-2">
-                     <button onClick={handleAddCategory} className="text-xs font-bold text-white bg-black px-3 py-1.5 rounded flex-1">Save</button>
-                     <button onClick={() => setIsAddingCategory(false)} className="text-xs text-gray-500 px-2">Cancel</button>
-                   </div>
+                    <span className="text-xs font-bold text-gray-700">Add Category</span>
+                    <input type="text" placeholder="EN Name" value={newCatEn} onChange={e => setNewCatEn(e.target.value)} className="text-sm p-2 border rounded w-full" />
+                    <input type="text" placeholder="AR Name" value={newCatAr} onChange={e => setNewCatAr(e.target.value)} className="text-sm p-2 border rounded w-full text-right" dir="rtl" />
+                    <div className="flex gap-2">
+                      <button onClick={handleAddCategory} className="text-xs font-bold text-white bg-black px-3 py-1.5 rounded flex-1">Save</button>
+                      <button onClick={() => setIsAddingCategory(false)} className="text-xs text-gray-500 px-2">Cancel</button>
+                    </div>
                  </div>
                ) : (
                  <button onClick={() => setIsAddingCategory(true)} className="flex items-center w-full p-2 border border-dashed border-gray-300 rounded-xl text-gray-500 hover:text-black hover:border-black transition-colors justify-center text-sm font-bold mt-2">
-                   <Plus className="w-4 h-4 mr-2 rtl:ml-2" /> Add Category
+                    <Plus className="w-4 h-4 mr-2 rtl:ml-2" /> Add Category
                  </button>
                )}
             </li>
           )}
         </ul>
       </div>
-
-      <div>
-         <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-5">
-          {t('Shop by Store')}
-        </h3>
-        <ul className="space-y-4 text-sm">
-           <li key="all-stores">
-              <button 
-                onClick={() => handleStoreClick('jaknooma')}
-                className={`flex items-center w-full text-left rtl:text-right font-medium transition-all group ${
-                  currentStore === 'jaknooma' ? 'text-black' : 'text-gray-500 hover:text-black rtl:hover:-translate-x-1 hover:translate-x-1'
-                }`}
-              >
-                <div className={`w-4 h-4 overflow-hidden rounded-sm mr-3 rtl:ml-3 ${currentStore === 'jaknooma' ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`}>
-                   <LogoIcon />
-                </div>
-                <span>{t('Jaknooma')}</span>
-              </button>
-           </li>
-          {!loadingStores && stores.map((store) => {
-            const isActive = currentStore === store.id;
-            return (
-              <li key={store.id}>
-                <button 
-                  onClick={() => handleStoreClick(store.id)}
-                  className={`flex items-center w-full text-left rtl:text-right font-medium transition-all group ${
-                    isActive ? 'text-black' : 'text-gray-500 hover:text-black rtl:hover:-translate-x-1 hover:translate-x-1'
-                  }`}
-                >
-                  {store.logo ? (
-                     <img src={store.logo} alt={store.name} className={`w-4 h-4 mr-3 rtl:ml-3 rounded-sm object-contain ${isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`} />
-                  ) : (
-                     <Store className={`w-4 h-4 mr-3 rtl:ml-3 ${isActive ? 'text-black' : 'text-gray-400 group-hover:text-black'}`} />
-                  )}
-                  <span>{store.name}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <div>
-         <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-5">
-          {t('Price Range')}
-        </h3>
-         <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <input 
-                type="number" 
-                placeholder={t('Min')} 
-                value={currentMin}
-                onChange={(e) => handlePriceChange('minPrice', e.target.value)}
-                className="w-full text-sm py-2 px-3 border border-gray-200 rounded-xl bg-gray-50 text-black placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-left rtl:text-right" 
-              />
-              <span className="text-gray-400">-</span>
-              <input 
-                type="number" 
-                placeholder={t('Max')} 
-                value={currentMax}
-                onChange={(e) => handlePriceChange('maxPrice', e.target.value)}
-                className="w-full text-sm py-2 px-3 border border-gray-200 rounded-xl bg-gray-50 text-black placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-left rtl:text-right" 
-              />
-            </div>
-         </div>
-      </div>
-
-      <div className="mb-8">
-         <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-5">
-          {t('Sustainability')}
-        </h3>
-        <div className="bg-black/5 p-5 rounded-2xl border border-black/5 hover:border-black/10 transition-colors">
-          <p className="text-sm leading-relaxed text-gray-600 mb-3">{t('All our products are sourced from zero-waste artisan studios')}</p>
-          <a href="#" className="text-sm font-bold underline text-black">{t('Our Manifesto')}</a>
-        </div>
-      </div>
-      
     </div>
   );
 
