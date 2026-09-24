@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ProductCard, { Product } from './ProductCard';
+import SponsoredAdSlot from './SponsoredAdSlot'; // استدعاء مكون الإعلانات الذي أنشأناه
 import { collection, query, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { fetchImages } from '../services/imageService';
-import { searchWithAgent } from '../services/agentService'; // استدعاء خدمة الـ AI Agent
+import { searchWithAgent } from '../services/agentService';
 
 const checkIsVipActive = (product: any): boolean => {
   const isVipFlag = Boolean(product.isVIP || product.isVip);
@@ -86,7 +87,7 @@ export default function ProductGrid() {
     fetchData();
   }, []);
 
-  // 2. إذا كانت كلمة البحث موجودة، نطلب من الـ AI Agent جلب المنتجات تلقائياً
+  // 2. البحث الذكي عبر الـ AI Agent
   useEffect(() => {
     if (!queryFilter) {
       setAgentProducts([]);
@@ -108,11 +109,8 @@ export default function ProductGrid() {
     fetchFromAgent();
   }, [queryFilter]);
 
-  // دمج المنتجات المحلية مع منتجات الـ AI Agent وفلترتها
   const allProducts = useMemo(() => {
     const combined = [...localProducts, ...agentProducts];
-    
-    // إزالة التكرار بالـ id أو العنوان
     const uniqueMap = new Map();
     combined.forEach(p => {
       const key = p.id || p.title || p.name;
@@ -120,7 +118,6 @@ export default function ProductGrid() {
         uniqueMap.set(key, p);
       }
     });
-
     return Array.from(uniqueMap.values());
   }, [localProducts, agentProducts]);
 
@@ -173,27 +170,37 @@ export default function ProductGrid() {
   }, [allProducts, categoryFilter, subCategoryFilter, minPriceFilter, maxPriceFilter, storeFilters, queryFilter]);
 
   return (
-    <div className="flex-1 px-4 md:px-8 lg:px-12 py-8 mx-auto w-full max-w-[1400px]">
+    <div className="flex-1 px-3 sm:px-8 lg:px-12 py-6 mx-auto w-full max-w-[1400px]">
+      
+      {/* بانر إعلاني مميز في أعلى الصفحة (Hero Ad Placement) */}
+      <div className="mb-8">
+        <SponsoredAdSlot 
+          placement="hero" 
+          adData={null} // اتركها null لتعرض زر "ضع إعلانك هنا" الجذاب أو اربطها بإعلان من قاعدة البيانات
+          onBookClick={() => alert('سيتم فتح صفحة حجز الإعلان قريباً')} 
+        />
+      </div>
+
       {image.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {image.map((item) => (
-            <img key={item.id} src={item.url} alt={item.alt} className="w-full h-auto rounded-lg shadow-md" />
+            <img key={item.id} src={item.url} alt={item.alt} className="w-full h-auto rounded-xl shadow-xs" />
           ))}
         </div>
       )}
 
       {(loading || agentLoading) ? (
         <div className="flex flex-col justify-center items-center py-20 gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black"></div>
           {agentLoading && (
-            <p className="text-sm text-gray-500 font-medium animate-pulse">
+            <p className="text-xs sm:text-sm text-gray-500 font-medium animate-pulse">
               جاري البحث عبر الـ AI Agent...
             </p>
           )}
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-lg text-gray-500 font-medium">
+          <p className="text-base sm:text-lg text-gray-500 font-medium">
             {t('لا توجد نتائج تطابق بحثك حالياً')}
           </p>
         </div>
@@ -201,22 +208,35 @@ export default function ProductGrid() {
         <motion.div
           initial="hidden"
           animate="visible"
-          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-12"
+          variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.03 } } }}
+          className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-3 gap-y-6 sm:gap-x-6 sm:gap-y-10"
         >
-          {filteredProducts.slice(0, visibleCount).map((product) => (
-            <motion.div key={product.id || product.title} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-              <ProductCard product={product} />
-            </motion.div>
+          {filteredProducts.slice(0, visibleCount).map((product, index) => (
+            <React.Fragment key={product.id || product.title}>
+              <motion.div variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }}>
+                <ProductCard product={product} />
+              </motion.div>
+
+              {/* دمج إعلان شبكي (Grid Ad) بعد كل 8 منتجات لزيادة الأرباح بدون إزعاج */}
+              {index === 7 && (
+                <div className="col-span-2">
+                  <SponsoredAdSlot 
+                    placement="grid" 
+                    adData={null} 
+                    onBookClick={() => alert('حجز إعلان في شبكة المنتجات')}
+                  />
+                </div>
+              )}
+            </React.Fragment>
           ))}
         </motion.div>
       )}
 
       {visibleCount < filteredProducts.length && (
-        <div className="flex justify-center mt-12 pb-12 w-full">
+        <div className="flex justify-center mt-10 pb-10 w-full">
           <button
             onClick={() => setVisibleCount(prev => prev + 12)}
-            className="px-8 py-4 bg-black text-white rounded-full font-bold uppercase tracking-widest text-xs hover:bg-gray-800 transition-all shadow-lg"
+            className="px-6 py-3 bg-black text-white rounded-full font-bold uppercase tracking-widest text-[11px] hover:bg-gray-800 transition-all shadow-md active:scale-95"
           >
             {t('Load More')}
           </button>
