@@ -32,7 +32,6 @@ export default function ProductGrid(props: ProductGridProps) {
   const currentSub = searchParams.get('sub') || searchParams.get('brand') || '';
   const searchQuery = searchParams.get('q') || '';
 
-  // جلب المنتجات تلقائياً من Firebase إذا لم يتم تمريرها كـ props
   useEffect(() => {
     if (!props.filteredProducts) {
       async function loadProducts() {
@@ -58,7 +57,6 @@ export default function ProductGrid(props: ProductGridProps) {
   const rawProducts = props.filteredProducts || fetchedProducts;
   const isLoading = props.loading !== undefined ? props.loading : fetchLoading;
 
-  // فلترة المنتجات بناءً على بحث المستخدم أو الفئة المختارة
   const finalProducts = props.filteredProducts ? props.filteredProducts : rawProducts.filter(product => {
     if (currentCategory) {
       const matchCat = (product as any).category === currentCategory || (product as any).storeName === currentCategory;
@@ -79,9 +77,9 @@ export default function ProductGrid(props: ProductGridProps) {
   const imagesList = props.image || [];
 
   return (
-    <div className="w-full flex flex-col items-center justify-start px-4 md:px-8 py-6 box-border">
+    <div className="w-full flex flex-col items-center justify-start px-2 sm:px-6 py-6 box-border overflow-x-hidden">
       {imagesList.length > 0 && (
-        <div className="w-full max-w-[1400px] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 justify-items-center">
+        <div className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 justify-items-center">
           {imagesList.map((item) => (
             <img key={item.id} src={item.url} alt={item.alt} className="w-full h-auto rounded-xl shadow-sm object-cover" />
           ))}
@@ -104,18 +102,18 @@ export default function ProductGrid(props: ProductGridProps) {
           </p>
         </div>
       ) : (
-        /* شبكة المنتجات المتجاوبة والمسنترة تماماً في المنتصف للكمبيوتر والجوال */
+        /* شبكة المنتجات: عمودين على الجوال، و 3 إلى 4 أعمدة على الكمبيوتر والشاشات الكبيرة مع التوسيط التام */
         <motion.div
           initial="hidden"
           animate="visible"
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.03 } } }}
-          className="w-full max-w-[1400px] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mx-auto justify-items-center items-center box-border"
+          className="w-full max-w-[1400px] grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 mx-auto justify-items-center items-stretch box-border"
         >
           {finalProducts.slice(0, visibleCount).map((product) => (
             <motion.div 
               key={product.id || product.title} 
               variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }}
-              className="w-full flex justify-center max-w-[300px] sm:max-w-none"
+              className="w-full flex justify-center"
             >
               <ProductCard product={product} />
             </motion.div>
