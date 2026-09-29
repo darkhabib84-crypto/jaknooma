@@ -17,10 +17,10 @@ workflows:
           else
             npx cap sync android
           fi
-      - name: Generate Fixed Keystore & Export Certificate
+      - name: Generate Permanent Keystore & Export Certificate
         script: |
           mkdir -p keystores
-          # توليد مفتاح ثابت وثابت بكلمة مرور ومعلومات دقيقة لكي لا يتغير أبداً
+          # توليد مفتاح ثابت ببيانات موحدة لكي لا يتغير
           if [ ! -f "keystores/jaknooma-key.jks" ]; then
             keytool -genkey -v -keystore "keystores/jaknooma-key.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
           fi
@@ -69,24 +69,5 @@ workflows:
           ./gradlew bundleRelease
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
-      - keystores/upload_certificate.pem
-
-  jaknooma-ios-workflow:
-    name: Build Jaknooma iOS App
-    instance_type: mac_mini_m1
-    environment:
-      node: lts
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Build web app
-        script: npm run build
-      - name: Initialize Capacitor iOS
-        script: |
-          npx cap add ios
-          npx cap sync ios
-      - name: Install CocoaPods
-        script: |
-          cd ios/App && pod install
+      - keystores/*.jks
+      - keystores/*.pem
