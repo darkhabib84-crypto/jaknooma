@@ -17,20 +17,12 @@ workflows:
           else
             npx cap sync android
           fi
-      - name: Generate Permanent Keystore & Export Certificate
-        script: |
-          mkdir -p keystores
-          # توليد مفتاح ثابت ببيانات موحدة لكي لا يتغير
-          if [ ! -f "keystores/jaknooma-key.jks" ]; then
-            keytool -genkey -v -keystore "keystores/jaknooma-key.jks" -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass "jaknooma123456" -keypass "jaknooma123456" -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, ST=Dubai, C=AE"
-          fi
-          # استخراج ملف الشهادة .pem لتقديمه لجوجل
-          keytool -export -rfc -keystore "keystores/jaknooma-key.jks" -alias jaknooma-alias -storepass "jaknooma123456" -file "keystores/upload_certificate.pem"
-      - name: Update SDK & Configure Signing Properly
+      - name: Configure Permanent Keystore from Codemagic
         script: |
           python3 -c '
-          import os, shutil, re
+          import os, re
 
+          # تحديث إعدادات الإصدار والـ SDK
           var_path = "android/variables.gradle"
           if os.path.exists(var_path):
               with open(var_path, "r") as f:
@@ -40,9 +32,7 @@ workflows:
               c = re.sub(r"targetSdkVersion\s*=\s*\d+", "targetSdkVersion = 36", c)
               open(var_path, "w").write(c)
 
-          if os.path.exists("keystores/jaknooma-key.jks"):
-              shutil.copy("keystores/jaknooma-key.jks", "android/app/jaknooma-key.jks")
-
+          # ربط ملف build.gradle بمفتاح Codemagic المحفوظ مسبقاً
           gp = "android/app/build.gradle"
           if os.path.exists(gp):
               with open(gp, "r") as f:
@@ -54,8 +44,9 @@ workflows:
               lb = chr(123)
               rb = chr(125)
 
+              signing_block = "\n    signingConfigs " + lb + "\n        release " + lb + "\n            storeFile file(System.getenv(\"CM_KEYSTORE_PATH\") ?: \"\")\n            storePassword System.getenv(\"CM_KEYSTORE_PASSWORD\")\n            keyAlias System.getenv(\"CM_KEY_ALIAS\")\n            keyPassword System.getenv(\"CM_KEY_PASSWORD\")\n        " + rb + "\n    " + rb + "\n"
+
               if "signingConfigs" not in c:
-                  signing_block = "\n    signingConfigs " + lb + "\n        release " + lb + "\n            storeFile file(\"jaknooma-key.jks\")\n            storePassword \"jaknooma123456\"\n            keyAlias \"jaknooma-alias\"\n            keyPassword \"jaknooma123456\"\n        " + rb + "\n    " + rb + "\n"
                   c = c.replace("android " + lb, "android " + lb + signing_block, 1)
 
               if "signingConfig signingConfigs.release" not in c:
@@ -69,5 +60,3 @@ workflows:
           ./gradlew bundleRelease
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
-      - keystores/*.jks
-      - keystores/*.pem
