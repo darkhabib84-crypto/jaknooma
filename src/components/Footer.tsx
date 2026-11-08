@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Mail, ShieldCheck } from 'lucide-react';
+import { Mail, ShieldCheck, Lock } from 'lucide-react';
 
 export default function Footer() {
   const { t, i18n } = useTranslation();
@@ -27,6 +27,15 @@ export default function Footer() {
             <ShieldCheck className="w-4 h-4" />
             {t('Terms & Conditions')}
           </Link>
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 hover:text-[#D4AF37] transition-colors text-sm font-medium"
+          >
+            <Lock className="w-4 h-4" />
+            {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          </a>
         </div>
       </div>
       
