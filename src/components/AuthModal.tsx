@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithCredential
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +19,8 @@ import { useTranslation } from 'react-i18next';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
+
+const WEB_CLIENT_ID = '215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com';
 
 export default function AuthModal() {
   const { isAuthModalOpen, authModalMode, closeAuthModal } = useAuth();
@@ -28,6 +35,40 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  const saveUserProfile = async (uid: string, additionalData: Record<string, any>) => {
+    await setDoc(doc(db, "users", uid), {
+      role: "customer",
+      status: "Active",
+      createdAt: serverTimestamp(),
+      ...additionalData
+    }, { merge: true });
+  };
+
+  // تهيئة إضافة Google Auth للأندرويد ومعالجة نتيجة Redirect إن وجدت
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({
+        clientId: WEB_CLIENT_ID,
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+    } else {
+      getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            await saveUserProfile(result.user.uid, {
+              email: result.user.email,
+              name: result.user.displayName || "Google User",
+            });
+            closeAuthModal();
+          }
+        })
+        .catch((err) => {
+          console.error("Redirect Auth Error:", err);
+        });
+    }
+  }, []);
 
   const resetFormState = () => {
     setError('');
@@ -50,17 +91,9 @@ export default function AuthModal() {
 
   if (!isAuthModalOpen) return null;
 
-  const saveUserProfile = async (uid: string, additionalData: Record<string, any>) => {
-    await setDoc(doc(db, "users", uid), {
-      role: "customer",
-      status: "Active",
-      createdAt: serverTimestamp(),
-      ...additionalData
-    }, { merge: true });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
     setMessage('');
     setLoading(true);
@@ -78,7 +111,6 @@ export default function AuthModal() {
       } else if (mode === 'login') {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         
-        // حفظ ملف المستخدم أو تحديثه عند تسجيل الدخول (يتكفل بالحسابات القديمة والجديدة)
         await saveUserProfile(userCredential.user.uid, {
           email: userCredential.user.email,
           name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || "User",
@@ -97,19 +129,67 @@ export default function AuthModal() {
   };
 
   const handleGoogleSignIn = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      
-      await saveUserProfile(result.user.uid, {
-        email: result.user.email,
-        name: result.user.displayName || "Google User",
-      });
+    if (loading) return;
+    setError('');
+    setLoading(true);
 
-      closeAuthModal();
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // 1. تسجيل الدخول الأصلي السريع داخل تطبيق الأندرويد / iOS
+        GoogleAuth.initialize({
+          clientId: WEB_CLIENT_ID,
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser?.authentication?.idToken;
+
+        if (!idToken) {
+          throw new Error('لم يتم استلام رمز المصادقة من Google');
+        }
+
+        const credential = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, credential);
+
+        await saveUserProfile(result.user.uid, {
+          email: result.user.email,
+          name: result.user.displayName || googleUser.name || "Google User",
+        });
+
+        closeAuthModal();
+      } else {
+        // 2. تسجيل الدخول في متصفح الويب
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+
+        try {
+          const result = await signInWithPopup(auth, provider);
+          await saveUserProfile(result.user.uid, {
+            email: result.user.email,
+            name: result.user.displayName || "Google User",
+          });
+          closeAuthModal();
+        } catch (popupErr: any) {
+          // إذا كان المتصفح يمنع النوافذ المنبثقة نحوله تلقائياً إلى Redirect
+          if (
+            popupErr.code === 'auth/cancelled-popup-request' ||
+            popupErr.code === 'auth/popup-blocked' ||
+            popupErr.code === 'auth/operation-not-supported-in-this-environment'
+          ) {
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+          throw popupErr;
+        }
+      }
     } catch (err: any) {
       console.error("Google Auth Error:", err);
-      setError(err.message || t('Failed to sign in with Google'));
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError(err.message || t('Failed to sign in with Google'));
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -227,7 +307,8 @@ export default function AuthModal() {
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
-                  className="flex justify-center items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-2 focus:ring-black/5 transition-all text-sm font-medium text-black"
+                  disabled={loading}
+                  className="flex justify-center items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-2 focus:ring-black/5 transition-all text-sm font-medium text-black disabled:opacity-50"
                 >
                   <svg className="w-5 h-5 rtl:ml-2" viewBox="0 0 24 24">
                     <path
@@ -252,10 +333,11 @@ export default function AuthModal() {
 
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => {
                     toast(t('Apple login preview'), { icon: '🍎' });
                   }}
-                  className="flex justify-center items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-2 focus:ring-black/5 transition-all text-sm font-medium text-black"
+                  className="flex justify-center items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-2 focus:ring-black/5 transition-all text-sm font-medium text-black disabled:opacity-50"
                 >
                   <svg className="w-5 h-5 text-black rtl:ml-2" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.43.987 3.96.948 1.56-.048 2.599-1.503 3.595-2.97 1.144-1.682 1.616-3.322 1.643-3.411-.035-.018-3.189-1.222-3.218-4.85-.027-3.04 2.48-4.494 2.597-4.559-1.428-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.512 1.09zM15.502 3.833c.843-1.026 1.411-2.453 1.257-3.882-1.226.05-2.735.815-3.6 1.865-.77.91-1.455 2.37-1.26 3.766 1.365.106 2.766-.724 3.603-1.749z" />
