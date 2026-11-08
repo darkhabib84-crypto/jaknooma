@@ -3,6 +3,9 @@ name: Build Signed Android Release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
@@ -20,7 +23,6 @@ jobs:
           rm -rf node_modules package-lock.json
           npm cache clean --force
           npm install --force
-          # تثبيت ملف الـ Oxide الخاص باللينكس يدوياً لضمان عدم اختفائه
           npm install @tailwindcss/oxide --force
 
       - name: Build web project
@@ -32,22 +34,52 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Add Capacitor Android Platform & Update Version Code
+      - name: Add Capacitor Android Platform & Inject Google Auth Config
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
+          
+          # نسخ ملف google-services.json تلقائياً إذا كان موجوداً في المشروع
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/google-services.json
+          fi
+
+          # حقن المفتاح الثابت server_client_id داخل strings.xml تلقائياً
+          sed -i 's|</resources>|    <string name="server_client_id">215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com</string>\n</resources>|g' android/app/src/main/res/values/strings.xml
+
           npx cap sync android
           
-          # رفع رقم الإصدار تلقائياً لتجنب مشاكل الترقية في جوجل بلاي
-          sed -i 's/versionCode 1/versionCode 10/g' android/app/build.gradle
-          sed -i 's/versionName "1.0"/versionName "1.0.1"/g' android/app/build.gradle
+          # رفع رقم الإصدار تلقائياً بناءً على رقم عملية البناء حتى لا يتكرر أبداً في جوجل بلاي
+          VERSION_CODE=$((15 + ${{ github.run_number }}))
+          sed -i "s/versionCode 1/versionCode $VERSION_CODE/g" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
 
-      - name: Generate Keystore & Build Signed AAB
+      - name: Create or Reuse Permanent Keystore
         run: |
-          cd android/app
-          keytool -genkey -v -keystore jaknooma-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, S=Dubai, C=AE"
+          # إذا كان المفتاح موجوداً في المستودع نستخدمه، وإذا لم يكن موجوداً ننشئه مرة واحدة فقط ونحفظه للأبد في GitHub
+          if [ ! -f "jaknooma-release-key.jks" ]; then
+            echo "Creating permanent keystore for the first and last time..."
+            keytool -genkey -v -keystore jaknooma-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, S=Dubai, C=AE"
+            
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add -f jaknooma-release-key.jks
+            git commit -m "chore: save permanent Android keystore [skip ci]"
+            git push
+          else
+            echo "Using existing permanent keystore from repository!"
+          fi
 
+          # نسخ المفتاح الثابت إلى مجلد البناء
+          cp jaknooma-release-key.jks android/app/jaknooma-release-key.jks
+
+          echo "========== PERMANENT SHA-1 FOR FIREBASE =========="
+          keytool -list -v -keystore android/app/jaknooma-release-key.jks -alias jaknooma-alias -storepass jaknooma123 | grep -E "SHA1:|SHA-256:"
+          echo "=================================================="
+
+      - name: Build Signed AAB & APK
+        run: |
           echo "
           android {
               signingConfigs {
@@ -64,14 +96,22 @@ jobs:
                   }
               }
           }
-          " >> build.gradle
+          " >> android/app/build.gradle
 
-          cd ../..
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease assembleRelease
 
-      - name: Upload Signed AAB Artifact
+      - name: Upload Signed AAB, APK & Certificate PEM
+        run: |
+          # استخراج ملف شهادة .pem جاهز في حال طلبه جوجل بلاي لآخر مرة
+          keytool -export -rfc -keystore jaknooma-release-key.jks -alias jaknooma-alias -file upload_certificate.pem -storepass jaknooma123
+        
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: google-play-release-bundle
-          path: android/app/build/outputs/bundle/release/*.aab
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/release/*.apk
+            jaknooma-release-key.jks
+            upload_certificate.pem
