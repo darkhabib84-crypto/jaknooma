@@ -48,16 +48,11 @@ jobs:
           # حقن المفتاح الثابت server_client_id داخل strings.xml تلقائياً
           sed -i 's|</resources>|    <string name="server_client_id">215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com</string>\n</resources>|g' android/app/src/main/res/values/strings.xml
 
-          # رفع minSdkVersion من 22 إلى 24 لتلبية متطلبات الحماية التلقائية في Google Play
-          sed -i 's/minSdkVersion = 22/minSdkVersion = 24/g' android/variables.gradle
-          sed -i 's/minSdkVersion 22/minSdkVersion 24/g' android/app/build.gradle
-
           npx cap sync android
-          
-          # رفع رقم الإصدار تلقائياً بناءً على رقم عملية البناء حتى لا يتكرر أبداً في جوجل بلاي
-          VERSION_CODE=$((15 + ${{ github.run_number }}))
-          sed -i "s/versionCode 1/versionCode $VERSION_CODE/g" android/app/build.gradle
-          sed -i "s/versionName \"1.0\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
+
+          # تعديل شامل لأي قيمة minSdkVersion في variables.gradle و build.gradle إلى 24
+          sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
+          sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
 
       - name: Create or Reuse Permanent Keystore
         run: |
@@ -76,14 +71,18 @@ jobs:
 
           cp jaknooma-release-key.jks android/app/jaknooma-release-key.jks
 
-          echo "========== PERMANENT SHA-1 FOR FIREBASE =========="
-          keytool -list -v -keystore android/app/jaknooma-release-key.jks -alias jaknooma-alias -storepass jaknooma123 | grep -E "SHA1:|SHA-256:"
-          echo "=================================================="
-
       - name: Build Signed AAB & APK
         run: |
+          VERSION_CODE=$((20 + ${{ github.run_number }}))
+
           echo "
           android {
+              defaultConfig {
+                  minSdkVersion 24
+                  minSdk 24
+                  versionCode $VERSION_CODE
+                  versionName \"1.0.$VERSION_CODE\"
+              }
               signingConfigs {
                   release {
                       storeFile file('jaknooma-release-key.jks')
@@ -110,7 +109,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: google-play-release-bundle
+          name: google-play-release-bundle-sdk24
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/release/*.apk
