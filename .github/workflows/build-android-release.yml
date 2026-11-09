@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-android:
@@ -39,39 +39,31 @@ jobs:
           if [ ! -d "android" ]; then
             npx cap add android
           fi
-          
-          # نسخ ملف google-services.json تلقائياً إذا كان موجوداً في المشروع
+
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/google-services.json
           fi
 
-          # حقن المفتاح الثابت server_client_id داخل strings.xml تلقائياً
           sed -i 's|</resources>|    <string name="server_client_id">215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com</string>\n</resources>|g' android/app/src/main/res/values/strings.xml
 
           npx cap sync android
 
-          # تعديل شامل لأي قيمة minSdkVersion في variables.gradle و build.gradle إلى 24
           sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
           sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
 
-      - name: Create or Reuse Permanent Keystore
+      - name: Decode keystore from GitHub Secrets
         run: |
-          if [ ! -f "jaknooma-release-key.jks" ]; then
-            echo "Creating permanent keystore for the first and last time..."
-            keytool -genkey -v -keystore jaknooma-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias jaknooma-alias -storepass jaknooma123 -keypass jaknooma123 -dname "CN=Jaknooma, OU=Dev, O=Jaknooma, L=Dubai, S=Dubai, C=AE"
-            
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add -f jaknooma-release-key.jks
-            git commit -m "chore: save permanent Android keystore [skip ci]"
-            git push
-          else
-            echo "Using existing permanent keystore from repository!"
-          fi
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/jaknooma-release-key.jks
 
-          cp jaknooma-release-key.jks android/app/jaknooma-release-key.jks
+      - name: Verify keystore SHA1
+        run: |
+          keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
 
       - name: Build Signed AAB & APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           VERSION_CODE=$((20 + ${{ github.run_number }}))
 
@@ -86,9 +78,9 @@ jobs:
               signingConfigs {
                   release {
                       storeFile file('jaknooma-release-key.jks')
-                      storePassword 'jaknooma123'
-                      keyAlias 'jaknooma-alias'
-                      keyPassword 'jaknooma123'
+                      storePassword System.getenv('KEYSTORE_PASSWORD')
+                      keyAlias System.getenv('KEY_ALIAS')
+                      keyPassword System.getenv('KEY_PASSWORD')
                   }
               }
               buildTypes {
@@ -102,10 +94,6 @@ jobs:
           cd android
           ./gradlew bundleRelease assembleRelease
 
-      - name: Upload Signed AAB, APK & Certificate PEM
-        run: |
-          keytool -export -rfc -keystore jaknooma-release-key.jks -alias jaknooma-alias -file upload_certificate.pem -storepass jaknooma123
-        
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -113,5 +101,3 @@ jobs:
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/release/*.apk
-            jaknooma-release-key.jks
-            upload_certificate.pem
