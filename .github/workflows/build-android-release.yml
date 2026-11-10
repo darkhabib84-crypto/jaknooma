@@ -1,4 +1,4 @@
-name: Build Signed Android Release
+Name: Build Signed Android Release
 
 on:
   workflow_dispatch:
@@ -59,7 +59,7 @@ jobs:
         run: |
           keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
 
-      - name: Build Signed AAB & APK
+      - name: Configure Signing and Build Signed AAB
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -67,29 +67,36 @@ jobs:
         run: |
           VERSION_CODE=$((20 + ${{ github.run_number }}))
 
-          echo "
-          android {
-              defaultConfig {
-                  minSdkVersion 24
-                  minSdk 24
-                  versionCode $VERSION_CODE
-                  versionName \"1.0.$VERSION_CODE\"
-              }
+          # تعديل رقم الإصدار في build.gradle بدقة
+          sed -i -E "s/versionCode [0-9]+/versionCode $VERSION_CODE/g" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]+\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
+
+          # الحقن السليم لإعدادات التوقيع مباشرة داخل بلوك android
+          python3 -c "
+          with open('android/app/build.gradle', 'r') as f:
+              content = f.read()
+
+          signing_config = '''
               signingConfigs {
                   release {
                       storeFile file('jaknooma-release-key.jks')
-                      storePassword System.getenv('KEYSTORE_PASSWORD')
-                      keyAlias System.getenv('KEY_ALIAS')
-                      keyPassword System.getenv('KEY_PASSWORD')
+                      storePassword \"''' + '${{ secrets.KEYSTORE_PASSWORD }}' + '''\"
+                      keyAlias \"''' + '${{ secrets.KEY_ALIAS }}' + '''\"
+                      keyPassword \"''' + '${{ secrets.KEY_PASSWORD }}' + '''\"
                   }
               }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
-          " >> android/app/build.gradle
+          '''
+
+          build_types_target = 'buildTypes {'
+          if 'signingConfigs {' not in content:
+              content = content.replace(build_types_target, signing_config + '\n    ' + build_types_target)
+
+          # ربط الـ release بالـ signingConfig
+          content = content.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }')
+          
+          with open('android/app/build.gradle', 'w') as f:
+              f.write(content)
+          "
 
           cd android
           ./gradlew bundleRelease assembleRelease
