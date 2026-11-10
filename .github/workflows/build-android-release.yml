@@ -15,10 +15,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Remove any repo keystore to prevent conflicts
+      - name: Purge ALL existing keystores in repository
         run: |
-          rm -f *.jks *.keystore
-          rm -f android/app/*.jks android/app/*.keystore
+          find . -name "*.jks" -type f -delete
+          find . -name "*.keystore" -type f -delete
+          rm -rf ~/.android
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -60,44 +61,60 @@ jobs:
 
       - name: Decode keystore strictly from GitHub Secrets
         run: |
-          rm -f android/app/jaknooma-release-key.jks
           echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '[:space:]' | base64 -d > android/app/jaknooma-release-key.jks
 
-      - name: Verify keystore SHA1
-        run: |
-          keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
-
-      - name: Build & Explicitly Sign AAB with Correct Keystore
+      - name: Build, Strip Old Signatures, and Force-Sign with 24:2C:9B
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          VERSION_CODE=$((40 + ${{ github.run_number }}))
+          VERSION_CODE=$((50 + ${{ github.run_number }}))
 
           sed -i -E "s/versionCode\s+[0-9]+/versionCode $VERSION_CODE/g" android/app/build.gradle
           sed -i -E "s/versionName\s+\"[^\"]+\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
 
-          cd android
-          ./gradlew bundleRelease assembleRelease
+          # استخراج الاسم الحقيقي للـ Alias أوتوماتيكياً من داخل ملف المفتاح نفسه لمنع أي خطأ
+          ACTUAL_ALIAS=$(keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "$KEYSTORE_PASSWORD" | grep "Alias name:" | head -n 1 | awk '{print $3}')
+          echo "Detected Keystore Alias: $ACTUAL_ALIAS"
 
-          # توقيع ملف الـ AAB مباشرة بأداة jarsigner الرسمية لضمان استخدام مفتاح 24:2C بنسبة 100%
+          cd android
+          ./gradlew bundleRelease
+
           AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
+
+          # 1. مسح أي توقيع سابق داخل ملف الـ AAB نهائياً (حذف ملفات التوقيع من META-INF)
+          zip -d "$AAB_PATH" "META-INF/*.RSA" "META-INF/*.DSA" "META-INF/*.EC" "META-INF/*.SF" || true
+
+          # 2. توقيع ملف الـ AAB الخام بمفتاح 24:2C:9B حصرياً
           jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
             -keystore app/jaknooma-release-key.jks \
             -storepass "$KEYSTORE_PASSWORD" \
             -keypass "$KEY_PASSWORD" \
-            "$AAB_PATH" "$KEY_ALIAS"
+            "$AAB_PATH" "$ACTUAL_ALIAS"
 
-          echo "=== التحقق من بصمة ملف الـ AAB النهائي ==="
-          keytool -printcert -jarfile "$AAB_PATH" | grep -E "Owner|SHA1"
+          # 3. فحص صارم لبصمة ملف الـ AAB نفسه بعد التوقيع
+          echo "=== فحص شهادة ملف الـ AAB النهائي ==="
+          CERT_OUTPUT=$(keytool -printcert -jarfile "$AAB_PATH")
+          echo "$CERT_OUTPUT"
 
-          # إعادة تسمية الملف برقم العملية حتى لا يختلط مع أي ملف قديم في كمبيوترك
-          cp "$AAB_PATH" "app/build/outputs/bundle/release/jaknooma-signed-run-${{ github.run_number }}.aab"
+          if echo "$CERT_OUTPUT" | grep -q "24:2C:9B:F3:C4:93:6B:79:D4:53:F8:20:47:B8:06:1D:C8:92:11:A6"; then
+            echo "✅ تم التأكد 100%: ملف الـ AAB موقع بالبصمة الصحيحة 24:2C:9B فقط!"
+          else
+            echo "❌ خطأ: البصمة لا تطابق 24:2C:9B!"
+            exit 1
+          fi
+
+          if echo "$CERT_OUTPUT" | grep -q "C6:F6:20:40"; then
+            echo "❌ خطأ: البصمة الخاطئة C6:F6 لا زالت موجودة!"
+            exit 1
+          fi
+
+          cp "$AAB_PATH" "app/build/outputs/bundle/release/jaknooma-pure-242C-run-${{ github.run_number }}.aab"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jaknooma-ready-for-playstore-${{ github.run_number }}
+          name: jaknooma-pure-242C-${{ github.run_number }}
           path: |
-            android/app/build/outputs/bundle/release/jaknooma-signed-run-*.aab
+            android/app/build/outputs/bundle/release/jaknooma-pure-242C-run-*.aab
