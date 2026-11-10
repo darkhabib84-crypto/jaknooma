@@ -15,6 +15,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Remove any repo keystore to prevent conflicts
+        run: |
+          rm -f *.jks *.keystore
+          rm -f android/app/*.jks android/app/*.keystore
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -62,45 +67,37 @@ jobs:
         run: |
           keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
 
-      - name: Build Signed AAB & APK
+      - name: Build & Explicitly Sign AAB with Correct Keystore
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          VERSION_CODE=$((30 + ${{ github.run_number }}))
+          VERSION_CODE=$((40 + ${{ github.run_number }}))
 
-          cat << EOF >> android/app/build.gradle
-
-          android {
-              defaultConfig {
-                  minSdkVersion 24
-                  versionCode $VERSION_CODE
-                  versionName "1.0.$VERSION_CODE"
-              }
-              signingConfigs {
-                  release {
-                      storeFile file('jaknooma-release-key.jks')
-                      storePassword System.getenv('KEYSTORE_PASSWORD')
-                      keyAlias System.getenv('KEY_ALIAS')
-                      keyPassword System.getenv('KEY_PASSWORD')
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
-          EOF
+          sed -i -E "s/versionCode\s+[0-9]+/versionCode $VERSION_CODE/g" android/app/build.gradle
+          sed -i -E "s/versionName\s+\"[^\"]+\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
 
           cd android
           ./gradlew bundleRelease assembleRelease
 
+          # توقيع ملف الـ AAB مباشرة بأداة jarsigner الرسمية لضمان استخدام مفتاح 24:2C بنسبة 100%
+          AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore app/jaknooma-release-key.jks \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            "$AAB_PATH" "$KEY_ALIAS"
+
+          echo "=== التحقق من بصمة ملف الـ AAB النهائي ==="
+          keytool -printcert -jarfile "$AAB_PATH" | grep -E "Owner|SHA1"
+
+          # إعادة تسمية الملف برقم العملية حتى لا يختلط مع أي ملف قديم في كمبيوترك
+          cp "$AAB_PATH" "app/build/outputs/bundle/release/jaknooma-signed-run-${{ github.run_number }}.aab"
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: google-play-release-bundle-sdk24
+          name: jaknooma-ready-for-playstore-${{ github.run_number }}
           path: |
-            android/app/build/outputs/bundle/release/*.aab
-            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/jaknooma-signed-run-*.aab
