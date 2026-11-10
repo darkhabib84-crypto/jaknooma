@@ -2,9 +2,13 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User, 
   onAuthStateChanged,
-  signOut
+  signOut,
+  OAuthProvider,
+  signInWithPopup,
+  signInWithRedirect
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface AuthContextType {
@@ -12,6 +16,7 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   logout: () => Promise<void>;
+  loginWithApple: () => Promise<User | null>;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'signup' | 'email-link' | 'phone';
   openAuthModal: (mode?: 'login' | 'signup' | 'email-link' | 'phone') => void;
@@ -53,6 +58,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
+  const loginWithApple = async (): Promise<User | null> => {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    provider.setCustomParameters({
+      locale: 'ar'
+    });
+
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const loggedInUser = result.user;
+
+      if (loggedInUser) {
+        try {
+          const userRef = doc(db, 'users', loggedInUser.uid);
+          const userSnap = await getDoc(userRef);
+
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              uid: loggedInUser.uid,
+              email: loggedInUser.email || '',
+              displayName: loggedInUser.displayName || 'مستخدم آبل',
+              photoURL: loggedInUser.photoURL || '',
+              provider: 'apple',
+              createdAt: new Date().toISOString()
+            });
+          }
+        } catch (firestoreError) {
+          console.error('Error saving Apple user to Firestore:', firestoreError);
+        }
+      }
+
+      setIsAuthModalOpen(false);
+      return loggedInUser;
+    } catch (error: any) {
+      // في حال حظر المتصفح للـ Popup في بيئة الهواتف نحوله إلى Redirect
+      if (Capacitor.isNativePlatform() && error?.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      throw error;
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
@@ -64,7 +113,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, loading, logout, isAuthModalOpen, authModalMode, openAuthModal, closeAuthModal }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        isAdmin, 
+        loading, 
+        logout, 
+        loginWithApple, 
+        isAuthModalOpen, 
+        authModalMode, 
+        openAuthModal, 
+        closeAuthModal 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
