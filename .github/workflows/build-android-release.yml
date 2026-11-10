@@ -53,19 +53,14 @@ jobs:
           sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
           sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
 
-      - name: Prepare Keystore & Export PEM Certificate
+      - name: Decode keystore strictly from GitHub Secrets
         run: |
-          if [ -f "jaknooma-release-key.jks" ]; then
-            cp jaknooma-release-key.jks android/app/jaknooma-release-key.jks
-          else
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/jaknooma-release-key.jks
-          fi
+          rm -f android/app/jaknooma-release-key.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '[:space:]' | base64 -d > android/app/jaknooma-release-key.jks
 
-          keytool -export -rfc \
-            -keystore android/app/jaknooma-release-key.jks \
-            -alias "${{ secrets.KEY_ALIAS }}" \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -file upload_certificate.pem
+      - name: Verify keystore SHA1
+        run: |
+          keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
 
       - name: Build Signed AAB & APK
         env:
@@ -105,8 +100,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: google-play-release-bundle
+          name: google-play-release-bundle-sdk24
           path: |
             android/app/build/outputs/bundle/release/*.aab
             android/app/build/outputs/apk/release/*.apk
-            upload_certificate.pem
