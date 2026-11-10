@@ -1,18 +1,87 @@
-      - name: Configure Signing and Build Signed AAB
+name: Build Signed Android Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Clean install and force Linux Tailwind Binding
+        run: |
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          npm install --force
+          npm install @tailwindcss/oxide --force
+
+      - name: Build web project
+        run: npm run build
+
+      - name: Set up Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Add Capacitor Android Platform & Inject Google Auth Config
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/google-services.json
+          fi
+
+          sed -i 's|</resources>|    <string name="server_client_id">215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com</string>\n</resources>|g' android/app/src/main/res/values/strings.xml
+
+          npx cap sync android
+
+          sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
+          sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
+
+      - name: Prepare Keystore & Export PEM Certificate
+        run: |
+          if [ -f "jaknooma-release-key.jks" ]; then
+            cp jaknooma-release-key.jks android/app/jaknooma-release-key.jks
+          else
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/jaknooma-release-key.jks
+          fi
+
+          keytool -export -rfc \
+            -keystore android/app/jaknooma-release-key.jks \
+            -alias "${{ secrets.KEY_ALIAS }}" \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -file upload_certificate.pem
+
+      - name: Build Signed AAB & APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          VERSION_CODE=$((20 + ${{ github.run_number }}))
+          VERSION_CODE=$((30 + ${{ github.run_number }}))
 
-          # كتابة إعدادات الـ signingConfigs وتعديل الـ buildTypes مباشرة في ملف build.gradle
-          cat << 'EOF' >> android/app/build.gradle
+          cat << EOF >> android/app/build.gradle
 
           android {
               defaultConfig {
-                  versionCode 25
-                  versionName "1.0.25"
+                  minSdkVersion 24
+                  versionCode $VERSION_CODE
+                  versionName "1.0.$VERSION_CODE"
               }
               signingConfigs {
                   release {
@@ -32,3 +101,12 @@
 
           cd android
           ./gradlew bundleRelease assembleRelease
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-play-release-bundle
+          path: |
+            android/app/build/outputs/bundle/release/*.aab
+            android/app/build/outputs/apk/release/*.apk
+            upload_certificate.pem
