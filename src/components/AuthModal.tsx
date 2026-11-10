@@ -17,7 +17,7 @@ import { auth, db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -37,13 +37,17 @@ export default function AuthModal() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // ينشئ مستند المستخدم مرة واحدة فقط، ولا يعيد الكتابة إذا كان موجوداً
   const saveUserProfile = async (uid: string, additionalData: Record<string, any>) => {
-    await setDoc(doc(db, "users", uid), {
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) return;
+    await setDoc(ref, {
       role: "customer",
       status: "Active",
       createdAt: serverTimestamp(),
       ...additionalData
-    }, { merge: true });
+    });
   };
 
   // تهيئة إضافة Google Auth للأندرويد ومعالجة نتيجة Redirect (سواء من Google أو Apple) إن وجدت
@@ -116,7 +120,7 @@ export default function AuthModal() {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         
         await saveUserProfile(userCredential.user.uid, {
-          email: userCredential.user.email,
+          email: userCredential.user.email || '',
           name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || "User",
         });
 
@@ -157,7 +161,7 @@ export default function AuthModal() {
         const result = await signInWithCredential(auth, credential);
 
         await saveUserProfile(result.user.uid, {
-          email: result.user.email,
+          email: result.user.email || '',
           name: result.user.displayName || googleUser.name || "Google User",
           provider: 'google'
         });
@@ -171,7 +175,7 @@ export default function AuthModal() {
         try {
           const result = await signInWithPopup(auth, provider);
           await saveUserProfile(result.user.uid, {
-            email: result.user.email,
+            email: result.user.email || '',
             name: result.user.displayName || "Google User",
             provider: 'google'
           });
