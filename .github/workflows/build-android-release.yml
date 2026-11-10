@@ -1,64 +1,3 @@
-Name: Build Signed Android Release
-
-on:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  build-android:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Clean install and force Linux Tailwind Binding
-        run: |
-          rm -rf node_modules package-lock.json
-          npm cache clean --force
-          npm install --force
-          npm install @tailwindcss/oxide --force
-
-      - name: Build web project
-        run: npm run build
-
-      - name: Set up Java (JDK 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Add Capacitor Android Platform & Inject Google Auth Config
-        run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
-
-          if [ -f "google-services.json" ]; then
-            cp google-services.json android/app/google-services.json
-          fi
-
-          sed -i 's|</resources>|    <string name="server_client_id">215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com</string>\n</resources>|g' android/app/src/main/res/values/strings.xml
-
-          npx cap sync android
-
-          sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
-          sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
-
-      - name: Decode keystore from GitHub Secrets
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/jaknooma-release-key.jks
-
-      - name: Verify keystore SHA1
-        run: |
-          keytool -list -v -keystore android/app/jaknooma-release-key.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" | grep -E "Alias|SHA1"
-
       - name: Configure Signing and Build Signed AAB
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -67,44 +6,29 @@ jobs:
         run: |
           VERSION_CODE=$((20 + ${{ github.run_number }}))
 
-          # تعديل رقم الإصدار في build.gradle بدقة
-          sed -i -E "s/versionCode [0-9]+/versionCode $VERSION_CODE/g" android/app/build.gradle
-          sed -i -E "s/versionName \"[^\"]+\"/versionName \"1.0.$VERSION_CODE\"/g" android/app/build.gradle
+          # كتابة إعدادات الـ signingConfigs وتعديل الـ buildTypes مباشرة في ملف build.gradle
+          cat << 'EOF' >> android/app/build.gradle
 
-          # الحقن السليم لإعدادات التوقيع مباشرة داخل بلوك android
-          python3 -c "
-          with open('android/app/build.gradle', 'r') as f:
-              content = f.read()
-
-          signing_config = '''
+          android {
+              defaultConfig {
+                  versionCode 25
+                  versionName "1.0.25"
+              }
               signingConfigs {
                   release {
                       storeFile file('jaknooma-release-key.jks')
-                      storePassword \"''' + '${{ secrets.KEYSTORE_PASSWORD }}' + '''\"
-                      keyAlias \"''' + '${{ secrets.KEY_ALIAS }}' + '''\"
-                      keyPassword \"''' + '${{ secrets.KEY_PASSWORD }}' + '''\"
+                      storePassword System.getenv('KEYSTORE_PASSWORD')
+                      keyAlias System.getenv('KEY_ALIAS')
+                      keyPassword System.getenv('KEY_PASSWORD')
                   }
               }
-          '''
-
-          build_types_target = 'buildTypes {'
-          if 'signingConfigs {' not in content:
-              content = content.replace(build_types_target, signing_config + '\n    ' + build_types_target)
-
-          # ربط الـ release بالـ signingConfig
-          content = content.replace('buildTypes {', 'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n        }')
-          
-          with open('android/app/build.gradle', 'w') as f:
-              f.write(content)
-          "
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
 
           cd android
           ./gradlew bundleRelease assembleRelease
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: google-play-release-bundle-sdk24
-          path: |
-            android/app/build/outputs/bundle/release/*.aab
-            android/app/build/outputs/apk/release/*.apk
