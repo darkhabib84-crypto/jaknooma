@@ -7,6 +7,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -24,7 +25,7 @@ const WEB_CLIENT_ID = '215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.google
 
 export default function AuthModal() {
   const { isAuthModalOpen, authModalMode, closeAuthModal } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   
   const [mode, setMode] = useState<AuthMode>(
     authModalMode === 'phone' || authModalMode === 'email-link' ? 'login' : (authModalMode as AuthMode)
@@ -45,7 +46,7 @@ export default function AuthModal() {
     }, { merge: true });
   };
 
-  // تهيئة إضافة Google Auth للأندرويد ومعالجة نتيجة Redirect إن وجدت
+  // تهيئة إضافة Google Auth للأندرويد ومعالجة نتيجة Redirect (سواء من Google أو Apple) إن وجدت
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
@@ -53,21 +54,23 @@ export default function AuthModal() {
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
-    } else {
-      getRedirectResult(auth)
-        .then(async (result) => {
-          if (result?.user) {
-            await saveUserProfile(result.user.uid, {
-              email: result.user.email,
-              name: result.user.displayName || "Google User",
-            });
-            closeAuthModal();
-          }
-        })
-        .catch((err) => {
-          console.error("Redirect Auth Error:", err);
-        });
     }
+
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          const isApple = result.providerId === 'apple.com';
+          await saveUserProfile(result.user.uid, {
+            email: result.user.email || '',
+            name: result.user.displayName || (isApple ? "Apple User" : "Google User"),
+            provider: isApple ? 'apple' : 'google'
+          });
+          closeAuthModal();
+        }
+      })
+      .catch((err) => {
+        console.error("Redirect Auth Error:", err);
+      });
   }, []);
 
   const resetFormState = () => {
@@ -105,6 +108,7 @@ export default function AuthModal() {
         await saveUserProfile(userCredential.user.uid, {
           email: email,
           name: email.split('@')[0],
+          provider: 'password'
         });
         
         closeAuthModal();
@@ -155,6 +159,7 @@ export default function AuthModal() {
         await saveUserProfile(result.user.uid, {
           email: result.user.email,
           name: result.user.displayName || googleUser.name || "Google User",
+          provider: 'google'
         });
 
         closeAuthModal();
@@ -168,6 +173,7 @@ export default function AuthModal() {
           await saveUserProfile(result.user.uid, {
             email: result.user.email,
             name: result.user.displayName || "Google User",
+            provider: 'google'
           });
           closeAuthModal();
         } catch (popupErr: any) {
@@ -187,6 +193,54 @@ export default function AuthModal() {
       console.error("Google Auth Error:", err);
       if (err.code !== 'auth/popup-closed-by-user') {
         setError(err.message || t('Failed to sign in with Google'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    if (loading) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      provider.setCustomParameters({
+        locale: i18n?.language || 'ar'
+      });
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        await saveUserProfile(result.user.uid, {
+          email: result.user.email || '',
+          name: result.user.displayName || result.user.email?.split('@')[0] || "Apple User",
+          provider: 'apple'
+        });
+        toast.success(t('Welcome Back'));
+        closeAuthModal();
+      } catch (popupErr: any) {
+        if (
+          popupErr.code === 'auth/cancelled-popup-request' ||
+          popupErr.code === 'auth/popup-blocked' ||
+          popupErr.code === 'auth/operation-not-supported-in-this-environment'
+        ) {
+          await signInWithRedirect(auth, provider);
+          return;
+        }
+        throw popupErr;
+      }
+    } catch (err: any) {
+      console.error("Apple Auth Error:", err);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return;
+      }
+      if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/invalid-credential') {
+        setError(t('Apple Sign-In is being configured. Please use Google or Email for now.'));
+      } else {
+        setError(err.message || t('Failed to sign in with Apple'));
       }
     } finally {
       setLoading(false);
@@ -333,10 +387,8 @@ export default function AuthModal() {
 
                 <button
                   type="button"
+                  onClick={handleAppleSignIn}
                   disabled={loading}
-                  onClick={() => {
-                    toast(t('Apple login preview'), { icon: '🍎' });
-                  }}
                   className="flex justify-center items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-2 focus:ring-black/5 transition-all text-sm font-medium text-black disabled:opacity-50"
                 >
                   <svg className="w-5 h-5 text-black rtl:ml-2" viewBox="0 0 24 24" fill="currentColor">
