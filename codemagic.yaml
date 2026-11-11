@@ -37,7 +37,7 @@ workflows:
           if os.path.exists(gp):
               with open(gp, "r") as f:
                   c = f.read()
-              
+
               if "compileSdkVersion" not in c and "compileSdk " not in c:
                   c = c.replace("android {", "android {\n    compileSdkVersion 36\n    defaultConfig {\n        targetSdkVersion 36\n    }\n", 1)
 
@@ -61,7 +61,7 @@ workflows:
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
 
-    jaknooma-ios-workflow:
+  jaknooma-ios-workflow:
     name: Build Jaknooma iOS App
     instance_type: mac_mini_m2
     max_build_duration: 60
