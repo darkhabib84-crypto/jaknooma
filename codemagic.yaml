@@ -60,3 +60,47 @@ workflows:
           ./gradlew bundleRelease
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
+
+    jaknooma-ios-workflow:
+    name: Build Jaknooma iOS App
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      node: lts
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.jaknooma.app
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web app
+        script: npm run build
+      - name: Ensure Capacitor iOS package
+        script: |
+          if [ ! -d "node_modules/@capacitor/ios" ]; then
+            npm install @capacitor/ios@$(node -p "require('./node_modules/@capacitor/core/package.json').version")
+          fi
+      - name: Setup Capacitor iOS
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: Set build number
+        script: |
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/" ios/App/App.xcodeproj/project.pbxproj
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Build ipa
+        script: |
+          xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
