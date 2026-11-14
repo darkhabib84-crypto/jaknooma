@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, limit, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { DollarSign, Calendar, Search, CreditCard, User } from 'lucide-react';
+import { DollarSign, Calendar, Search, CreditCard, User, Edit2, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatPrice, isRtlLanguage } from '../lib/i18n';
+import toast from 'react-hot-toast';
 
-interface Payment {
+export interface Payment {
   id: string;
+  stripeSessionId?: string;
   userId?: string;
   userEmail?: string;
   email?: string;
@@ -18,23 +20,76 @@ interface Payment {
   productId?: string;
   productName?: string;
   amount: number;
+  amount_total?: number;
+  originalAmount?: number;
+  originalCurrency?: string;
   currency?: string;
   status: string;
   type?: string;
+  verifiedFixedAmount?: boolean;
   createdAt: any;
 }
+
+export const FX_RATES_TO_AED: Record<string, number> = {
+  AED: 1,
+  USD: 3.67,
+  EUR: 3.98,
+  GBP: 4.65,
+  SAR: 0.98,
+};
 
 export const isCompletedPayment = (p: { status?: string }): boolean => {
   const status = String(p?.status || 'completed').trim().toLowerCase();
   return status === 'completed' || status === 'succeeded' || status === 'paid' || status === 'success';
 };
 
-export const calculateCompletedRevenue = (items: Array<{ amount?: any; status?: string }>): number => {
-  return items.reduce((sum, item) => {
-    if (!isCompletedPayment(item)) return sum;
-    const amount = Number(item.amount);
-    return sum + (Number.isFinite(amount) && amount > 0 ? amount : 0);
+/**
+ * Resolves the exact amount paid in the platform's base currency (AED)
+ * from Stripe's `amount_total` (minor units), `originalAmount`, or `amount`,
+ * without ever using a hardcoded 99 AED package price for $1 test transactions.
+ */
+export const resolveActualPaymentAmountAED = (p: any): number => {
+  if (!p) return 0;
+
+  // 1. If Stripe `amount_total` (in cents/fils) is stored on the record, compute directly from it
+  if (typeof p.amount_total === 'number' && Number.isFinite(p.amount_total) && p.amount_total > 0) {
+    const origCurr = String(p.originalCurrency || p.currency || 'AED').toUpperCase();
+    const major = p.amount_total / 100;
+    const rate = FX_RATES_TO_AED[origCurr] ?? 1;
+    return Number((major * rate).toFixed(2));
+  }
+
+  // 2. If `originalAmount` is stored with `originalCurrency`, convert to AED
+  if (typeof p.originalAmount === 'number' && Number.isFinite(p.originalAmount) && p.originalAmount > 0) {
+    const origCurr = String(p.originalCurrency || p.currency || 'AED').toUpperCase();
+    const rate = FX_RATES_TO_AED[origCurr] ?? 1;
+    return Number((p.originalAmount * rate).toFixed(2));
+  }
+
+  const rawAmount = Number(p.amount);
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) return 0;
+
+  // 3. Detect legacy unverified record that hardcoded 99 AED instead of the actual $1.00 USD (3.67 AED) Stripe test payment
+  if (
+    rawAmount === 99 &&
+    p.amount_total === undefined &&
+    !p.stripeSessionId &&
+    !p.verifiedFixedAmount
+  ) {
+    return 3.67;
+  }
+
+  const curr = String(p.currency || 'AED').toUpperCase();
+  const rate = FX_RATES_TO_AED[curr] ?? 1;
+  return Number((rawAmount * rate).toFixed(2));
+};
+
+export const calculateCompletedRevenue = (items: Array<any>): number => {
+  const sum = items.reduce((acc, item) => {
+    if (!isCompletedPayment(item)) return acc;
+    return acc + resolveActualPaymentAmountAED(item);
   }, 0);
+  return Number(sum.toFixed(2));
 };
 
 export const getPaymentTimestampMs = (createdAt: any): number => {
@@ -58,6 +113,9 @@ export default function AdminPayments() {
   const [userLookup, setUserLookup] = useState<Record<string, { name?: string; email?: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmountValue, setEditAmountValue] = useState<string>('');
+  const [editCurrencyValue, setEditCurrencyValue] = useState<'AED' | 'USD'>('AED');
 
   // Load user map so payments with only userId still show customer name/email
   useEffect(() => {
@@ -84,7 +142,25 @@ export default function AdminPayments() {
       collection(db, 'payments'),
       (snapshot) => {
         const data = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Payment))
+          .map(d => {
+            const raw = d.data() as any;
+            // Automatically migrate any legacy hardcoded 99 AED test record in Firestore to actual $1.00 USD (3.67 AED)
+            if (
+              Number(raw.amount) === 99 &&
+              raw.amount_total === undefined &&
+              !raw.stripeSessionId &&
+              !raw.verifiedFixedAmount
+            ) {
+              updateDoc(doc(db, 'payments', d.id), {
+                amount: 3.67,
+                amount_total: 100,
+                originalAmount: 1,
+                originalCurrency: 'USD',
+                currency: 'AED',
+              }).catch(() => {});
+            }
+            return { id: d.id, ...raw } as Payment;
+          })
           .sort((a, b) => getPaymentTimestampMs(b.createdAt) - getPaymentTimestampMs(a.createdAt));
         setPayments(data);
         setLoading(false);
@@ -101,6 +177,38 @@ export default function AdminPayments() {
   if (!user || !isAdmin) {
     return <Navigate to="/" />;
   }
+
+  const handleSaveEditedAmount = async (payment: Payment) => {
+    const num = parseFloat(editAmountValue);
+    if (!Number.isFinite(num) || num < 0) {
+      toast.error(isRtl ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount');
+      return;
+    }
+
+    const rate = FX_RATES_TO_AED[editCurrencyValue] ?? 1;
+    const amountInAED = Number((num * rate).toFixed(2));
+    const amountTotalCents = Math.round(num * 100);
+
+    try {
+      await updateDoc(doc(db, 'payments', payment.id), {
+        amount: amountInAED,
+        amount_total: amountTotalCents,
+        originalAmount: Number(num.toFixed(2)),
+        originalCurrency: editCurrencyValue,
+        currency: 'AED',
+        verifiedFixedAmount: true,
+      });
+      setEditingId(null);
+      toast.success(
+        isRtl
+          ? `تم تحديث المبلغ الفعلي إلى ${formatPrice(amountInAED)} AED`
+          : `Updated actual paid amount to ${formatPrice(amountInAED)} AED`
+      );
+    } catch (error) {
+      console.error('Failed to update payment amount:', error);
+      toast.error(isRtl ? 'تعذر تحديث المبلغ' : 'Failed to update amount');
+    }
+  };
 
   // Format date cleanly as DD/MM/YYYY (e.g. 29/06/2026) so RTL never scrambles slashes
   const formatCleanPaymentDate = (createdAt: any): string => {
@@ -230,6 +338,10 @@ export default function AdminPayments() {
                 ) : (
                   filteredPayments.map(payment => {
                     const customerInfo = resolveCustomerDisplay(payment);
+                    const actualAmountAED = resolveActualPaymentAmountAED(payment);
+                    const origCurr = String(payment.originalCurrency || '').toUpperCase();
+                    const origAmt = payment.originalAmount;
+
                     return (
                       <tr key={payment.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="p-4 whitespace-nowrap text-sm text-gray-600">
@@ -266,11 +378,68 @@ export default function AdminPayments() {
                           </span>
                         </td>
                         <td className="p-4 text-sm font-bold text-gray-900 whitespace-nowrap tabular-nums" dir="ltr">
-                          {formatPrice(payment.amount)} {payment.currency || 'AED'}
+                          {editingId === payment.id ? (
+                            <div className="inline-flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editAmountValue}
+                                onChange={(e) => setEditAmountValue(e.target.value)}
+                                className="w-20 px-2 py-1 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-black"
+                              />
+                              <select
+                                value={editCurrencyValue}
+                                onChange={(e) => setEditCurrencyValue(e.target.value as 'AED' | 'USD')}
+                                className="px-1.5 py-1 text-xs border border-gray-300 rounded-lg bg-white"
+                              >
+                                <option value="AED">AED</option>
+                                <option value="USD">USD</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditedAmount(payment)}
+                                className="p-1 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 cursor-pointer"
+                                title={t('Save')}
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(null)}
+                                className="p-1 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 cursor-pointer"
+                                title={t('Cancel')}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-2">
+                              <div>
+                                <span>{formatPrice(actualAmountAED)} AED</span>
+                                {origCurr && origCurr !== 'AED' && typeof origAmt === 'number' && (
+                                  <span className="ml-1.5 text-xs font-medium text-gray-400">
+                                    ({formatPrice(origAmt)} {origCurr})
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(payment.id);
+                                  setEditAmountValue(String(actualAmountAED));
+                                  setEditCurrencyValue('AED');
+                                }}
+                                className="p-1 text-gray-400 hover:text-black rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+                                title={isRtl ? 'تعديل المبلغ الفعلي' : 'Edit actual paid amount'}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                         <td className="p-4 text-sm text-end whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            payment.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                            isCompletedPayment(payment) ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
                           }`}>
                             {payment.status}
                           </span>

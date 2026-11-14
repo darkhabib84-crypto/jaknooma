@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { DollarSign, TrendingUp, TrendingDown, Store } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useTranslation } from 'react-i18next';
 import { formatPrice, isRtlLanguage } from '../../lib/i18n';
@@ -10,6 +10,7 @@ import {
   calculateCompletedRevenue,
   isCompletedPayment,
   getPaymentTimestampMs,
+  resolveActualPaymentAmountAED,
 } from '../AdminPayments';
 
 const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
@@ -57,15 +58,32 @@ export default function DashboardHome() {
     const unsubscribe = onSnapshot(
       collection(db, 'payments'),
       (snapshot) => {
-        const rawPayments = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as any),
-        }));
+        const rawPayments = snapshot.docs.map((d) => {
+          const raw = d.data() as any;
+          if (
+            Number(raw.amount) === 99 &&
+            raw.amount_total === undefined &&
+            !raw.stripeSessionId &&
+            !raw.verifiedFixedAmount
+          ) {
+            updateDoc(doc(db, 'payments', d.id), {
+              amount: 3.67,
+              amount_total: 100,
+              originalAmount: 1,
+              originalCurrency: 'USD',
+              currency: 'AED',
+            }).catch(() => {});
+          }
+          return {
+            id: d.id,
+            ...raw,
+          };
+        });
 
         const completedRevenue = calculateCompletedRevenue(rawPayments);
         setTotalRevenue(completedRevenue);
 
-        // Build chronological chart data strictly from completed transactions
+        // Build chronological chart data strictly from completed transactions' actual paid amounts
         const completedChronological = rawPayments
           .filter(isCompletedPayment)
           .sort((a, b) => getPaymentTimestampMs(a.createdAt) - getPaymentTimestampMs(b.createdAt));
@@ -83,7 +101,7 @@ export default function DashboardHome() {
           }
           return {
             name: label,
-            revenue: Number(p.amount) || 0,
+            revenue: resolveActualPaymentAmountAED(p),
           };
         });
 

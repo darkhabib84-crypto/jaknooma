@@ -20,10 +20,30 @@ function enrichCategories(items: CategoryItem[]): CategoryItem[] {
       (fallback?.sub || []).map((s) => [s.en.toLowerCase(), s.ar])
     );
 
-    const enrichedSub = (item.sub || fallback?.sub || []).map((s) => ({
-      en: s.en,
-      ar: s.ar && s.ar !== s.en ? s.ar : subMap.get(s.en.toLowerCase()) || s.ar || s.en,
-    }));
+    const rawSubs = Array.isArray(item.sub) ? item.sub : [];
+    const fallbackSubs = fallback?.sub || [];
+
+    // Combine default subcategories with any custom subcategories from Firestore without duplicates
+    const combinedMap = new Map<string, { en: string; ar: string }>();
+    for (const s of [...fallbackSubs, ...rawSubs]) {
+      const enVal = typeof s === 'string' ? s : s.en;
+      if (!enVal) continue;
+      const key = enVal.trim().toLowerCase();
+      const arVal =
+        typeof s === 'object' && s.ar && s.ar !== s.en
+          ? s.ar
+          : subMap.get(key) || (typeof s === 'object' ? s.ar : '') || enVal;
+      combinedMap.set(key, { en: enVal, ar: arVal });
+    }
+
+    // Ensure "Other" / "أخرى (Other)" is always the final option when subcategories exist
+    const otherEntry = combinedMap.get('other') || { en: 'Other', ar: 'أخرى (Other)' };
+    combinedMap.delete('other');
+
+    const enrichedSub = Array.from(combinedMap.values());
+    if (enrichedSub.length > 0) {
+      enrichedSub.push(otherEntry);
+    }
 
     return {
       ...item,

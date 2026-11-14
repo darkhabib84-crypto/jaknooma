@@ -74,6 +74,21 @@ function AppContent() {
           .catch((error) => console.error("Error signing in with link", error));
       }
     }
+
+    // Verify Stripe Checkout Session on redirect to capture actual paid amount (amount_total)
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    if (sessionId) {
+      fetch(`/api/verify-stripe-session?session_id=${encodeURIComponent(sessionId)}`)
+        .then((res) => res.json())
+        .then(() => {
+          params.delete('session_id');
+          const nextSearch = params.toString();
+          const cleanUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`;
+          window.history.replaceState({}, document.title, cleanUrl);
+        })
+        .catch((err) => console.error('Stripe session verification error:', err));
+    }
   }, []);
 
   return (
