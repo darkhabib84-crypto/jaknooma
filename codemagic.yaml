@@ -90,6 +90,13 @@ workflows:
             npx cap add ios
           fi
           npx cap sync ios
+      - name: Set app icon
+        script: |
+          ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICON_DIR"
+          cp AppIcon-1024.png "$ICON_DIR/AppIcon-512@2x.png"
+          ls -la "$ICON_DIR"
+          cat "$ICON_DIR/Contents.json"
       - name: Set build number
         script: |
           sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/" ios/App/App.xcodeproj/project.pbxproj
