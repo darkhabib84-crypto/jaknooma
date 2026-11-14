@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Search, DollarSign, Activity, TrendingUp, TrendingDown, ArrowUpRight, Store } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { DollarSign, TrendingUp, TrendingDown, Store } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { useTranslation } from 'react-i18next';
+import { formatPrice, isRtlLanguage } from '../../lib/i18n';
 
 const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
   <motion.div
@@ -21,52 +24,61 @@ const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
     </div>
     <div>
       <h3 className="text-gray-500 text-sm font-medium mb-1">{title}</h3>
-      <h2 className="text-3xl font-bold tracking-tight text-black">{value}</h2>
+      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-black tabular-nums" dir="ltr">
+        {value}
+      </h2>
     </div>
   </motion.div>
 );
 
 export default function DashboardHome() {
   const [data, setData] = useState<any[]>([]);
+  const { t, i18n } = useTranslation();
+  const isRtl = isRtlLanguage(i18n.language);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const db = getFirestore();
-        const querySnapshot = await getDocs(collection(db, "products"));
-        const fetchedData = querySnapshot.docs.map(doc => ({
-          name: doc.data().name?.substring(0, 5) || "N/A",
-          revenue: parseInt(doc.data().price) || 0,
-          searches: 100
-        }));
+        const querySnapshot = await getDocs(collection(db, 'products'));
+        const fetchedData = querySnapshot.docs.map(doc => {
+          const d = doc.data();
+          const title = d.name || d.title || 'Item';
+          return {
+            name: title.substring(0, 8),
+            revenue: parseFloat(d.price) || 0,
+            searches: 100
+          };
+        });
         setData(fetchedData);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error('Error fetching data:', error);
       }
     };
     fetchData();
   }, []);
 
+  const totalValue = data.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
+
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-black mb-1">Overview</h1>
-          <p className="text-gray-500">Welcome back. Here's what's happening with Jaknooma today.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-black mb-1">{t('Overview')}</h1>
+          <p className="text-gray-500">{t("Welcome back. Here's what's happening with Jaknooma today.")}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Total Revenue" 
-          value={`$${data.reduce((acc, curr) => acc + (curr.revenue || 0), 0)}`} 
+          title={t('Total Revenue')} 
+          value={`${formatPrice(totalValue)} AED`} 
           change="0" 
           trend="up" 
           icon={DollarSign} 
         />
         <StatCard 
-          title="Total Products" 
-          value={data.length.toString()} 
+          title={t('Total Products')} 
+          value={formatPrice(data.length)} 
           change="0" 
           trend="up" 
           icon={Store} 
@@ -75,15 +87,22 @@ export default function DashboardHome() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <h3 className="font-bold text-lg mb-6">Revenue Overview</h3>
-          <div className="h-[300px] w-full">
+          <h3 className="font-bold text-lg mb-6">{t('Revenue Overview')}</h3>
+          <div className="h-[300px] w-full" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="revenue" stroke="#000" fill="#000" fillOpacity={0.1} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(val) => `${formatPrice(val)}`}
+                />
+                <Tooltip
+                  formatter={(value: any) => [`${formatPrice(value)} AED`, isRtl ? 'القيمة (AED)' : 'Value (AED)']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#000" fill="#D4AF37" fillOpacity={0.18} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -92,4 +111,3 @@ export default function DashboardHome() {
     </div>
   );
 }
-

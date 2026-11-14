@@ -63,7 +63,7 @@ export default function AddProductForm() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
+      const newFiles = Array.from<File>(e.target.files);
       setFilesToUpload(prev => [...prev, ...newFiles]);
       setPreviews(prev => [...prev, ...newFiles.map(file => URL.createObjectURL(file))]);
     }

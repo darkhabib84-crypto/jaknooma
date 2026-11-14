@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ProductCard, { Product } from './ProductCard';
+import ProductCard, { Product, detectProductStoreName } from './ProductCard';
 import { motion } from 'motion/react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
@@ -31,6 +31,7 @@ export default function ProductGrid(props: ProductGridProps) {
   const currentCategory = searchParams.get('category') || '';
   const currentSub = searchParams.get('sub') || searchParams.get('brand') || '';
   const searchQuery = searchParams.get('q') || '';
+  const selectedStores = searchParams.getAll('store').map((s) => s.toLowerCase());
 
   useEffect(() => {
     if (!props.filteredProducts) {
@@ -58,18 +59,34 @@ export default function ProductGrid(props: ProductGridProps) {
   const isLoading = props.loading !== undefined ? props.loading : fetchLoading;
 
   const finalProducts = props.filteredProducts ? props.filteredProducts : rawProducts.filter(product => {
+    if (selectedStores.length > 0) {
+      const detected = (detectProductStoreName(product) || '').toLowerCase();
+      const rawStore = ((product as any).storeId || product.storeName || '').toLowerCase();
+      const isLocal = !detected && !product.isExternalProduct && !product.externalUrl;
+      const matchesStore = selectedStores.some((st) => {
+        if (st === 'jaknooma') return isLocal || rawStore.includes('jaknooma');
+        return detected.includes(st) || rawStore.includes(st);
+      });
+      if (!matchesStore) return false;
+    }
     if (currentCategory) {
       const matchCat = (product as any).category === currentCategory || (product as any).storeName === currentCategory;
       if (!matchCat) return false;
     }
     if (currentSub) {
-      const matchSub = (product as any).subCategory === currentSub || (product as any).brand === currentSub;
-      if (!matchSub) return false;
+      const subLower = currentSub.toLowerCase();
+      const prodSub = String((product as any).subCategory || '').toLowerCase();
+      const prodBrand = String((product as any).brand || '').toLowerCase();
+      const prodTitle = String(product.name || product.title || '').toLowerCase();
+      if (prodSub !== subLower && prodBrand !== subLower && !prodTitle.includes(subLower)) {
+        return false;
+      }
     }
     if (searchQuery) {
       const queryStr = searchQuery.toLowerCase();
       const title = (product.name || product.title || '').toLowerCase();
-      if (!title.includes(queryStr)) return false;
+      const desc = String((product as any).description || '').toLowerCase();
+      if (!title.includes(queryStr) && !desc.includes(queryStr)) return false;
     }
     return true;
   });
@@ -77,7 +94,7 @@ export default function ProductGrid(props: ProductGridProps) {
   const imagesList = props.image || [];
 
   return (
-    <div className="w-full flex flex-col items-center justify-start px-2 sm:px-6 py-6 box-border overflow-x-hidden">
+    <div className="w-full flex flex-col items-center justify-start px-3 sm:px-6 py-5 box-border overflow-x-hidden">
       {imagesList.length > 0 && (
         <div className="w-full max-w-[1400px] grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 justify-items-center">
           {imagesList.map((item) => (
@@ -91,7 +108,7 @@ export default function ProductGrid(props: ProductGridProps) {
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black"></div>
           {props.agentLoading && (
             <p className="text-sm text-gray-500 font-medium animate-pulse text-center">
-              جاري البحث عبر الـ AI Agent...
+              {t('Processing...')}
             </p>
           )}
         </div>
@@ -102,12 +119,11 @@ export default function ProductGrid(props: ProductGridProps) {
           </p>
         </div>
       ) : (
-        /* شبكة المنتجات: عمودين على الجوال، و 3 إلى 4 أعمدة على الكمبيوتر والشاشات الكبيرة مع التوسيط التام */
         <motion.div
           initial="hidden"
           animate="visible"
           variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.03 } } }}
-          className="w-full max-w-[1400px] grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6 mx-auto justify-items-center items-stretch box-border"
+          className="w-full max-w-[1400px] grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5 mx-auto justify-items-center items-stretch box-border"
         >
           {finalProducts.slice(0, visibleCount).map((product) => (
             <motion.div 
@@ -127,7 +143,7 @@ export default function ProductGrid(props: ProductGridProps) {
             onClick={() => setVisibleCount(prev => prev + 12)}
             className="px-6 py-3 bg-black text-white rounded-full font-bold uppercase tracking-widest text-xs hover:bg-gray-800 transition-all shadow-md active:scale-95 cursor-pointer"
           >
-            {t('Load More') || 'عرض المزيد'}
+            {t('Load More')}
           </button>
         </div>
       )}

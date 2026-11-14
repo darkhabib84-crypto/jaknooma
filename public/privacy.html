@@ -1,83 +1,341 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl" id="html-root">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy Policy – Jaknooma</title>
-<style>
-  :root { --bg:#ffffff; --text:#374151; --head:#111827; --sub:#1f2937; --accent:#b8892b; --line:#e5e7eb; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#111418; --text:#d1d5db; --head:#f9fafb; --sub:#e5e7eb; --accent:#e0b04a; --line:#2d333b; }
-  }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:Inter,Arial,sans-serif; line-height:1.7; }
-  main { max-width:760px; margin:0 auto; padding:32px 20px 64px; }
-  h1 { color:var(--head); font-size:2rem; margin-bottom:4px; }
-  h2 { color:var(--sub); font-size:1.2rem; margin-top:32px; }
-  .updated { color:var(--accent); font-size:.9rem; margin-bottom:24px; }
-  a { color:var(--accent); }
-  ul { padding-left:20px; }
-  footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--line); font-size:.9rem; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy | سياسة الخصوصية – Jaknooma</title>
+  <meta name="description" content="Official Privacy Policy for Jaknooma Smart Shopping & Affiliate Marketplace Platform | سياسة الخصوصية الرسمية لمنصة جكنومة للتسوق الذكي" />
+  <style>
+    :root {
+      --bg: #FAFAFA;
+      --card: #FFFFFF;
+      --text: #374151;
+      --head: #111111;
+      --muted: #6B7280;
+      --accent: #D4AF37;
+      --accent-dark: #B8892B;
+      --border: #E5E7EB;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.8;
+      padding-bottom: 60px;
+    }
+    header {
+      background: #111111;
+      color: #FFFFFF;
+      padding: 18px 24px;
+      border-bottom: 2px solid var(--accent);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .header-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand span {
+      color: var(--accent);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lang-btn {
+      background: rgba(255, 255, 255, 0.1);
+      color: #FFFFFF;
+      border: 1px solid rgba(212, 175, 55, 0.4);
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .lang-btn.active, .lang-btn:hover {
+      background: var(--accent);
+      color: #111111;
+      border-color: var(--accent);
+    }
+    .back-link {
+      color: #D1D5DB;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.2s ease;
+    }
+    .back-link:hover {
+      color: #FFFFFF;
+      border-color: #FFFFFF;
+    }
+    main {
+      max-width: 900px;
+      margin: 32px auto 0;
+      padding: 0 20px;
+    }
+    .policy-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 36px 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    }
+    @media (max-width: 640px) {
+      .policy-card {
+        padding: 24px 18px;
+        border-radius: 18px;
+      }
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(212, 175, 55, 0.12);
+      color: var(--accent-dark);
+      font-weight: 700;
+      font-size: 0.78rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      color: var(--head);
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .updated {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    h2 {
+      color: var(--head);
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-bottom: 14px;
+      font-size: 0.98rem;
+    }
+    ul {
+      margin-bottom: 16px;
+      padding-inline-start: 22px;
+    }
+    li {
+      margin-bottom: 8px;
+      font-size: 0.96rem;
+    }
+    a {
+      color: var(--accent-dark);
+      text-decoration: underline;
+    }
+    footer {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
-<main>
-  <a href="/">&larr; Back to Jaknooma</a>
-  <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: November 9, 2026</p>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="brand">jaknooma <span>●</span></a>
+      <div class="header-actions">
+        <button type="button" id="btn-ar" class="lang-btn active" onclick="setLang('ar')">العربية</button>
+        <button type="button" id="btn-en" class="lang-btn" onclick="setLang('en')">English</button>
+        <a href="/" class="back-link" id="back-btn">العودة للمنصة</a>
+      </div>
+    </div>
+  </header>
 
-  <p>This Privacy Policy explains how Jaknooma ("we", "us", "our"), available at <a href="https://www.jaknooma.com">www.jaknooma.com</a>, collects, uses, and protects your information when you use our website and services.</p>
+  <main>
+    <!-- Arabic Content -->
+    <section id="content-ar" class="policy-card">
+      <span class="badge">وثيقة رسمية معتمدة</span>
+      <h1>سياسة الخصوصية – منصة جكنومة (Jaknooma)</h1>
+      <p class="updated">آخر تحديث: نوفمبر 2026</p>
 
-  <h2>1. Who We Are</h2>
-  <p>Jaknooma is a product aggregator and affiliate marketing platform. We help users discover products from third-party stores (such as Amazon, eBay, AliExpress, Shein, Temu, and Dubizzle). We do not sell or ship products directly. All purchases take place on the partner websites.</p>
+      <p>توضح سياسة الخصوصية هذه كيف تقوم منصة <strong>جكنومة (Jaknooma)</strong> ("نحن"، "لنا"، أو "المنصة")، المتاحة عبر الموقع الإلكتروني وتطبيقات الهواتف الذكية (<a href="https://www.jaknooma.com">www.jaknooma.com</a>)، بجمع واستخدام وحماية معلوماتك الشخصية عند تصفحك أو استخدامك لخدماتنا.</p>
 
-  <h2>2. Information We Collect</h2>
-  <ul>
-    <li><strong>Google account information:</strong> If you choose to sign in with Google, we receive your name, email address, and profile picture. We do not access your Gmail, Google Drive, contacts, calendar, or any other Google data.</li>
-    <li><strong>Information you provide:</strong> such as your name or email if you contact us, and items you add to your cart, favorites, or wishlist.</li>
-    <li><strong>Usage data:</strong> pages visited, search terms, clicks on partner links, device type, browser, language, and approximate location (country/region) derived from your IP address.</li>
-    <li><strong>Cookies and similar technologies:</strong> used to keep you signed in, remember your preferences, and measure site performance.</li>
-  </ul>
+      <h2>1. من نحن وطبيعة عمل المنصة</h2>
+      <p>جكنومة هي منصة تسوق ذكي ومجمّع عروض وإعلانات تعمل بنظام التسوق بالعمولة (Affiliate Aggregator) والإعلانات المحلية المباشرة. نحن نساعد المستخدمين على اكتشاف ومقارنة المنتجات والعروض من أشهر المتاجر العالمية والمحلية (مثل Amazon، SHEIN، Temu، AliExpress، eBay، وDubizzle) بالإضافة إلى إعلانات البائعين المحليين. نحن لا نبيع المنتجات أو نشحنها مباشرة؛ بل تتم عمليات الشراء عبر المتاجر الشريكة أو بالتواصل المباشر مع البائعين.</p>
 
-  <h2>3. How We Use Your Information</h2>
-  <ul>
-    <li>To create and manage your account and let you sign in.</li>
-    <li>To provide, personalize, and improve our services, including search and product recommendations.</li>
-    <li>To track affiliate link clicks so that we can receive commissions from partner stores.</li>
-    <li>To communicate with you about support requests or important service updates.</li>
-    <li>To protect the platform against fraud, abuse, and security threats.</li>
-  </ul>
+      <h2>2. المعلومات التي نقوم بجمعها</h2>
+      <ul>
+        <li><strong>معلومات الحساب وتسجيل الدخول (بما في ذلك Google):</strong> عند تسجيل الدخول عبر Google أو البريد الإلكتروني أو رقم الهاتف، نحصل على اسمك وعنوان بريدك الإلكتروني وصورة الملف الشخصي فقط لإنشاء حسابك. لا نطلب ولا نصل إلى رسائل البريد أو جهات الاتصال أو الملفات الخاصة بك.</li>
+        <li><strong>المعلومات التي تقدمها طوعاً:</strong> مثل تفاصيل الإعلانات التي تضيفها، أرقام التواصل الاختيارية للبائعين، والمنتجات التي تحفظها في عربة التسوق الذكية أو قائمة المفضلة.</li>
+        <li><strong>بيانات الاستخدام والتصفح:</strong> الصفحات التي تزورها، كلمات البحث، النقرات على روابط المتاجر الشريكة، نوع الجهاز، اللغة المفضلة، والموقع الجغرافي التقريبي (المدينة/الدولة) لتحسين دقة العروض.</li>
+        <li><strong>ملفات تعريف الارتباط (Cookies) والتخزين المحلي:</strong> تُستخدم لإبقائك مسجلاً للدخول وحفظ لغة الواجهة وعناصر السلة الذكية.</li>
+      </ul>
 
-  <h2>4. Google User Data</h2>
-  <p>Our use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. We only use Google user data (name, email, profile picture) to authenticate you and operate your account. We do not sell this data, do not use it for advertising, and do not transfer it to third parties except as needed to provide the service or as required by law.</p>
+      <h2>3. كيف نستخدم معلوماتك</h2>
+      <ul>
+        <li>لإنشاء حسابك وإدارته وتمكينك من حفظ المنتجات والإعلانات المفضلة.</li>
+        <li>لتشغيل وتخصيص وتحسين تجربة البحث وتوصيات المنتجات.</li>
+        <li>لتتبع النقرات الإحالية (Affiliate Links) لاحتساب العمولات من المتاجر الشريكة دون أي تكلفة إضافية عليك.</li>
+        <li>للتواصل معك بشأن طلبات الدعم الفني أو التحديثات الأمنية المهمة.</li>
+        <li>لحماية المنصة ومستخدميها من الاحتيال أو إساءة الاستخدام.</li>
+      </ul>
 
-  <h2>5. Third-Party Links and Affiliate Disclosure</h2>
-  <p>Jaknooma contains links to third-party websites. We may earn a commission when you purchase through these links, at no extra cost to you. Once you leave our site, the partner's own privacy policy and terms apply, and we are not responsible for their practices.</p>
+      <h2>4. التزام سياسة بيانات مستخدمي Google</h2>
+      <p>يتوافق استخدامنا للمعلومات المستلمة من واجهات برمجة تطبيقات Google مع <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">سياسة بيانات مستخدمي خدمات Google API</a>، بما في ذلك متطلبات الاستخدام المحدود (Limited Use). نحن لا نبيع بيانات مستخدمي Google ولا نستخدمها لأغراض إعلانية موجهة لطرف ثالث.</p>
 
-  <h2>6. Service Providers</h2>
-  <p>We use trusted providers to run the platform, including Google Firebase / Google Cloud (authentication, database, hosting) and GitHub (website hosting). These providers process data only on our behalf and under their own security and privacy commitments.</p>
+      <h2>5. الروابط الخارجية وإفصاح التسوق بالعمولة</h2>
+      <p>تحتوي منصة جكنومة على روابط توجهك إلى متاجر خارجية شريكة. قد تحصل المنصة على عمولة بسيطة عند إتمامك للشراء عبر هذه الروابط دون أي زيادة في السعر عليك. عند انتقالك إلى أي متجر خارجي، تسري سياسة الخصوصية والشروط الخاصة بذلك المتجر.</p>
 
-  <h2>7. Data Sharing</h2>
-  <p>We do not sell your personal information. We share it only with the service providers above, when required by law, or to protect our rights and users' safety.</p>
+      <h2>6. مزودو الخدمة وأمن البيانات</h2>
+      <p>نعتمد على خدمات سحابية موثوقة ومؤمنة مثل Google Firebase / Google Cloud لإدارة قواعد البيانات والمصادقة والاستضافة، مع تطبيق معايير التشفير والحماية التقنية لحماية بياناتك من الوصول غير المصرح به.</p>
 
-  <h2>8. Data Retention and Deletion</h2>
-  <p>We keep your information only as long as your account is active or as needed to provide the service. You can request deletion of your account and data at any time by contacting us at the email below, and we will process your request within a reasonable time.</p>
+      <h2>7. الاحتفاظ بالبيانات وحق الحذف</h2>
+      <p>نحتفظ ببيانات حسابك طالما كان حسابك نشطاً. يحق لك في أي وقت طلب الوصول إلى بياناتك الشخصية أو تعديلها أو حذف حسابك بالكامل عبر إعدادات الحساب أو بمراسلتنا مباشرة عبر البريد الإلكتروني الموضح أدناه.</p>
 
-  <h2>9. Data Security</h2>
-  <p>We use reasonable technical and organizational measures to protect your information. However, no method of transmission or storage is completely secure.</p>
+      <h2>8. خصوصية الأطفال</h2>
+      <p>خدماتنا غير موجهة للأطفال دون سن 13 عاماً، ولا نقوم عن قصد بجمع أي بيانات شخصية من الأطفال.</p>
 
-  <h2>10. Your Rights</h2>
-  <p>You may request access to, correction of, or deletion of your personal data, and you may withdraw consent at any time. You can also revoke Jaknooma's access from your Google account at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</p>
+      <h2>9. التواصل معنا</h2>
+      <p>إذا كان لديك أي استفسار أو طلب يتعلق بسياسة الخصوصية أو حذف البيانات، يسعدنا تواصلك معنا عبر البريد الإلكتروني: <a href="mailto:jaknooma@gmail.com">jaknooma@gmail.com</a></p>
 
-  <h2>11. Children's Privacy</h2>
-  <p>Our services are not directed to children under 13, and we do not knowingly collect personal information from them.</p>
+      <footer>
+        <span>&copy; 2026 Jaknooma. جميع الحقوق محفوظة.</span>
+        <a href="/terms.html">الشروط والأحكام</a>
+      </footer>
+    </section>
 
-  <h2>12. Changes to This Policy</h2>
-  <p>We may update this policy from time to time. The latest version will always be available on this page with the updated date.</p>
+    <!-- English Content -->
+    <section id="content-en" class="policy-card hidden">
+      <span class="badge">Official Policy Document</span>
+      <h1>Privacy Policy – Jaknooma</h1>
+      <p class="updated">Last updated: November 2026</p>
 
-  <h2>13. Contact Us</h2>
-  <p>If you have questions or requests regarding this Privacy Policy, contact us at: <a href="mailto:jaknooma@gmail.com">dark.habib84@gmail.com</a></p>
+      <p>This Privacy Policy explains how <strong>Jaknooma</strong> ("we", "us", "our"), available on the web and mobile apps at <a href="https://www.jaknooma.com">www.jaknooma.com</a>, collects, uses, and protects your information when you use our platform and services.</p>
 
-  <footer>&copy; 2026 Jaknooma. All rights reserved.</footer>
-</main>
+      <h2>1. Who We Are</h2>
+      <p>Jaknooma is a smart product aggregator, affiliate marketing platform, and local listings marketplace. We help users discover products and deals from global and regional partner stores (such as Amazon, SHEIN, Temu, AliExpress, eBay, and Dubizzle) alongside direct local seller listings. We do not sell or ship products directly; purchases occur on partner websites or directly with verified sellers.</p>
+
+      <h2>2. Information We Collect</h2>
+      <ul>
+        <li><strong>Account & Google Sign-In Information:</strong> If you sign in with Google, email, or phone, we receive your name, email address, and profile picture to authenticate your account. We do not access your Gmail, Google Drive, contacts, or calendar.</li>
+        <li><strong>Information You Provide:</strong> Details of product listings you submit, optional seller contact numbers, and items saved in your Smart Cart or Wishlist.</li>
+        <li><strong>Usage & Device Data:</strong> Pages visited, search queries, affiliate link clicks, device type, preferred language, and approximate city/region.</li>
+        <li><strong>Cookies & Local Storage:</strong> Used to maintain your session, remember language preferences, and store your Smart Cart items.</li>
+      </ul>
+
+      <h2>3. How We Use Your Information</h2>
+      <ul>
+        <li>To create and manage your account and sync your saved preferences.</li>
+        <li>To provide, personalize, and improve search and product discovery.</li>
+        <li>To track affiliate link referrals so partner stores can attribute commissions at no extra cost to you.</li>
+        <li>To respond to customer support inquiries and send essential security notices.</li>
+        <li>To prevent fraud, abuse, and unauthorized access.</li>
+      </ul>
+
+      <h2>4. Google User Data Compliance</h2>
+      <p>Our use and transfer of information received from Google APIs adheres strictly to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. We never sell Google user data or use it for third-party advertising.</p>
+
+      <h2>5. Third-Party Links & Affiliate Disclosure</h2>
+      <p>Jaknooma contains outbound links to partner marketplaces. We may earn a commission when you complete a purchase through these links at no additional cost to you. Once you leave Jaknooma, the third-party store's own privacy policy and terms govern your transaction.</p>
+
+      <h2>6. Service Providers & Security</h2>
+      <p>We rely on industry-standard infrastructure including Google Firebase and Google Cloud for authentication, database storage, and hosting, protected by encryption in transit and strict security rules.</p>
+
+      <h2>7. Data Retention & Account Deletion</h2>
+      <p>We retain your account information only while your account remains active. You may request access to, correction of, or complete deletion of your account and personal data at any time from your profile settings or by emailing us below.</p>
+
+      <h2>8. Children's Privacy</h2>
+      <p>Our services are not directed to children under 13, and we do not knowingly collect personal information from children.</p>
+
+      <h2>9. Contact Us</h2>
+      <p>For any questions or requests regarding this Privacy Policy or data deletion, please contact us at: <a href="mailto:jaknooma@gmail.com">jaknooma@gmail.com</a></p>
+
+      <footer>
+        <span>&copy; 2026 Jaknooma. All rights reserved.</span>
+        <a href="/terms.html?lang=en">Terms &amp; Conditions</a>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    function setLang(lang) {
+      var html = document.getElementById('html-root');
+      var arSec = document.getElementById('content-ar');
+      var enSec = document.getElementById('content-en');
+      var btnAr = document.getElementById('btn-ar');
+      var btnEn = document.getElementById('btn-en');
+      var backBtn = document.getElementById('back-btn');
+
+      if (lang === 'en') {
+        html.setAttribute('lang', 'en');
+        html.setAttribute('dir', 'ltr');
+        arSec.classList.add('hidden');
+        enSec.classList.remove('hidden');
+        btnEn.classList.add('active');
+        btnAr.classList.remove('active');
+        backBtn.textContent = '← Back to Jaknooma';
+      } else {
+        html.setAttribute('lang', 'ar');
+        html.setAttribute('dir', 'rtl');
+        enSec.classList.add('hidden');
+        arSec.classList.remove('hidden');
+        btnAr.classList.add('active');
+        btnEn.classList.remove('active');
+        backBtn.textContent = 'العودة للمنصة ←';
+      }
+    }
+
+    (function initLang() {
+      var params = new URLSearchParams(window.location.search);
+      var qLang = params.get('lang');
+      var stored = '';
+      try { stored = localStorage.getItem('i18nextLng') || ''; } catch (e) {}
+      var target = qLang || stored || 'ar';
+      if (target.toLowerCase().indexOf('ar') === 0) {
+        setLang('ar');
+      } else if (qLang === 'en' || (stored && stored.toLowerCase().indexOf('ar') !== 0)) {
+        setLang('en');
+      } else {
+        setLang('ar');
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -1,19 +1,32 @@
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { isRtlLanguage } from '../lib/i18n';
 
 export default function Terms() {
   const { i18n } = useTranslation();
   const navigate = useNavigate();
-  const isAr = i18n.language === 'ar';
+  const isAr = isRtlLanguage(i18n.language);
 
   return (
     <div className={`min-h-[calc(100vh-64px)] bg-white w-full overflow-y-auto ${isAr ? 'rtl' : 'ltr'}`} dir={isAr ? 'rtl' : 'ltr'}>
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-black mb-8 transition-colors">
-           <ArrowLeft className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
-           {isAr ? 'رجوع' : 'Back'}
-        </button>
+        <div className="flex items-center justify-between mb-8">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-black transition-colors cursor-pointer">
+            <ArrowLeft className={`w-4 h-4 ${isAr ? 'rotate-180' : ''}`} />
+            <span>{isAr ? 'رجوع' : 'Back'}</span>
+          </button>
+
+          <a
+            href={`/terms.html?lang=${isAr ? 'ar' : 'en'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-bold text-[#D4AF37] hover:underline"
+          >
+            <span>{isAr ? 'فتح في صفحة مستقلة' : 'Open Standalone Page'}</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
         
         <h1 className="text-4xl font-serif font-bold text-black mb-6">
           {isAr ? 'الشروط والأحكام' : 'Terms & Conditions'}

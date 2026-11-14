@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, User, Calendar, ExternalLink, ImageOff, ShoppingBag } from 'lucide-react';
+import { MapPin, User, Calendar, ExternalLink, ImageOff, ShoppingBag, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { formatPrice, isRtlLanguage } from '../lib/i18n';
+import { useCart } from '../contexts/CartContext';
 
 export interface Product {
   id: string;
   name?: string;
   title?: string;
+  description?: string;
+  category?: string;
+  subCategory?: string;
+  brand?: string;
   price: number;
   originalPrice?: number;
   currency?: string;
@@ -17,10 +24,12 @@ export interface Product {
   isVIP?: boolean;
   externalUrl?: string;
   affiliateLink?: string;
+  externalStoreLink?: string;
   sellerPhone?: string;
   phone?: string;
   discountPercent?: number;
   location?: string;
+  city?: string;
   sellerName?: string;
   storeName?: string;
   storeId?: string;
@@ -32,20 +41,80 @@ interface ProductCardProps {
   product: Product;
 }
 
+const KNOWN_STORES: { key: string; label: string }[] = [
+  { key: 'amazon', label: 'Amazon' },
+  { key: 'shein', label: 'SHEIN' },
+  { key: 'temu', label: 'Temu' },
+  { key: 'aliexpress', label: 'AliExpress' },
+  { key: 'ebay', label: 'eBay' },
+  { key: 'dubizzle', label: 'Dubizzle' },
+];
+
+export function detectProductStoreName(product: Product): string | null {
+  const candidates = [
+    product.storeName,
+    product.storeId,
+    product.sellerName,
+    product.externalUrl,
+    product.affiliateLink,
+    product.externalStoreLink,
+    product.location,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
+
+  for (const store of KNOWN_STORES) {
+    if (candidates.some((c) => c.includes(store.key))) {
+      return store.label;
+    }
+  }
+  if (product.storeName && product.storeName.trim() !== '') {
+    return product.storeName.trim();
+  }
+  return null;
+}
+
+export function getCleanCityLocation(product: Product, t: (k: string) => string): string {
+  const rawLoc = (product.city || product.location || '').trim();
+  if (!rawLoc) return t('Abu Dhabi');
+
+  const lower = rawLoc.toLowerCase();
+  const isStoreOrInvalid =
+    KNOWN_STORES.some((s) => lower.includes(s.key)) ||
+    lower === 'jaknooma' ||
+    lower === 'external' ||
+    lower === 'خارجي' ||
+    lower === 'شحن دولي' ||
+    lower === 'not specified' ||
+    lower === 'غير محدد';
+
+  if (isStoreOrInvalid) {
+    return t('Abu Dhabi');
+  }
+
+  return t(rawLoc) || rawLoc;
+}
+
 export default function ProductCard({ product }: ProductCardProps) {
+  const { t, i18n } = useTranslation();
+  const { addToCart } = useCart();
+  const isRtl = isRtlLanguage(i18n.language);
+
   if (!product) return null;
 
-  const isExternal = product.isExternalProduct || Boolean(product.externalUrl);
+  const detectedStore = detectProductStoreName(product);
+  const targetExternalUrl = product.externalUrl || product.affiliateLink || product.externalStoreLink;
+  const isExternal = Boolean(product.isExternalProduct || targetExternalUrl || detectedStore);
+  const badgeLabel = isExternal ? (detectedStore || t('External Store')) : t('Local Listing');
+
   const discount = product.discountPercent || 0;
   const originalPrice = Number(product.originalPrice || product.price || 0);
-  const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount / 100) : Number(product.price || 0);
-  
-  // معالجة آمنة لرمز العملة (يأخذ عملة المنتج أو افتراضياً AED)
-  const currencySymbol = product.currency ? product.currency.trim() : 'AED';
-  
-  const productName = product.name || product.title || 'منتج بدون عنوان';
+  const finalPrice = discount > 0 ? originalPrice - (originalPrice * discount) / 100 : Number(product.price || 0);
 
-  // معالجة آمنة للصور
+  const currencySymbol = product.currency ? product.currency.trim() : 'AED';
+  const productName = product.name || product.title || (isRtl ? 'منتج بدون عنوان' : 'Untitled Product');
+  const cityLocation = getCleanCityLocation(product, t);
+
   const imageList: string[] = (() => {
     let rawImages: string[] = [];
     if (Array.isArray(product.images) && product.images.length > 0) {
@@ -56,104 +125,147 @@ export default function ProductCard({ product }: ProductCardProps) {
         rawImages = [singleImage];
       }
     }
-    return rawImages.map(url => {
+    return rawImages.map((url) => {
       const cleanUrl = url.trim();
       if (cleanUrl.startsWith('http')) return cleanUrl;
-      const base = import.meta.env.BASE_URL || '/';
+      const base = (import.meta as any).env?.BASE_URL || '/';
       return cleanUrl.startsWith('/') ? `${base}${cleanUrl.slice(1)}` : `${base}${cleanUrl}`;
     });
   })();
 
   const formatDate = (timestamp: any) => {
-    if (!timestamp) return 'Just now';
+    if (!timestamp) return t('Just now');
     try {
-      const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch (e) {
-      return 'Just now';
+      const date = timestamp.seconds
+        ? new Date(timestamp.seconds * 1000)
+        : timestamp.toDate
+        ? timestamp.toDate()
+        : new Date(timestamp);
+      return date.toLocaleDateString(isRtl ? 'ar-AE' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return t('Just now');
     }
   };
 
   const resolveBadgePath = (path: string) => {
-    const base = import.meta.env.BASE_URL || '/';
+    const base = (import.meta as any).env?.BASE_URL || '/';
     return path.startsWith('/') ? `${base}${path.slice(1)}` : `${base}${path}`;
   };
 
+  const handleQuickAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart({
+      ...product,
+      storeName: detectedStore || product.storeName,
+      externalUrl: targetExternalUrl,
+    });
+  };
+
   const cardBody = (
-    <div className="w-full flex flex-col box-border">
-      {/* حاوية الصور */}
-      <div className="relative w-full pt-[110%] sm:pt-[120%] bg-[#F5F5F0] rounded-xl sm:rounded-2xl mb-2.5 overflow-hidden">
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="w-full flex flex-col box-border text-start">
+      {/* Image Container */}
+      <div className="relative w-full pt-[105%] sm:pt-[115%] bg-[#F5F5F0] rounded-xl sm:rounded-2xl mb-2.5 overflow-hidden">
         {!isExternal && (
-          <div className="absolute top-2.5 left-2.5 z-30 flex flex-col gap-1">
+          <div className={`absolute top-2.5 ${isRtl ? 'right-2.5' : 'left-2.5'} z-30 flex flex-col gap-1`}>
             {product.isVIP && (
-              <img 
-                src={resolveBadgePath('images/jaknooma-vip.png')} 
-                alt="VIP" 
-                className="w-7 sm:w-8 h-auto" 
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+              <img
+                src={resolveBadgePath('images/jaknooma-vip.png')}
+                alt="VIP"
+                className="w-7 sm:w-8 h-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
               />
             )}
             {discount >= 10 && (
-              <img 
-                src={resolveBadgePath('images/jaknooma-10.png')} 
-                alt="Gold" 
-                className="w-7 sm:w-8 h-auto" 
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} 
+              <img
+                src={resolveBadgePath('images/jaknooma-10.png')}
+                alt="Gold"
+                className="w-7 sm:w-8 h-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
               />
             )}
             {discount > 0 && discount < 10 && (
-              <img 
-                src={resolveBadgePath('images/jaknooma-5.png')} 
-                alt="Silver" 
-                className="w-7 sm:w-8 h-auto" 
-                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }} 
+              <img
+                src={resolveBadgePath('images/jaknooma-5.png')}
+                alt="Silver"
+                className="w-7 sm:w-8 h-auto"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
               />
             )}
           </div>
         )}
 
-        {isExternal && (
-          <span className="absolute top-2.5 right-2.5 z-30 px-2 py-0.5 bg-black/85 backdrop-blur-sm text-white text-[9px] sm:text-[10px] font-bold rounded-full uppercase tracking-wider shadow-sm">
-            {product.storeName || 'خارجي'}
-          </span>
-        )}
+        {/* Store / Local Listing Badge in Corner of Image */}
+        <span
+          className={`absolute top-2.5 ${
+            isRtl ? 'left-2.5' : 'right-2.5'
+          } z-30 px-2.5 py-1 text-[10px] font-bold rounded-lg tracking-wide shadow-sm backdrop-blur-md ${
+            isExternal
+              ? 'bg-black/85 text-[#D4AF37] border border-[#D4AF37]/30'
+              : 'bg-white/90 text-gray-800 border border-gray-200/80'
+          }`}
+        >
+          {badgeLabel}
+        </span>
+
+        {/* Quick Add to Smart Cart Button */}
+        <button
+          type="button"
+          onClick={handleQuickAddToCart}
+          title={t('Add to Cart')}
+          className={`absolute bottom-2.5 ${
+            isRtl ? 'left-2.5' : 'right-2.5'
+          } z-30 w-8 h-8 rounded-full bg-white/95 hover:bg-black text-black hover:text-white shadow-md border border-gray-200/80 flex items-center justify-center transition-colors cursor-pointer`}
+        >
+          <Plus size={15} />
+        </button>
 
         {imageList.length > 0 ? (
           <div className="absolute inset-0 flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide">
             {imageList.map((imgUrl, index) => (
               <div key={index} className="w-full h-full flex-shrink-0 snap-center relative">
-                <SafeImage src={imgUrl} alt={`${productName} - ${index + 1}`} />
+                <SafeImage src={imgUrl} alt={`${productName} - ${index + 1}`} unavailableText={t('Unavailable')} />
               </div>
             ))}
           </div>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-xs gap-1">
             <ImageOff size={18} />
-            <span className="text-[9px]">لا توجد صورة</span>
+            <span className="text-[10px]">{t('No Image')}</span>
           </div>
         )}
       </div>
 
-      {/* تفاصيل المنتج */}
+      {/* Product Info */}
       <div className="flex flex-col px-1 pb-1 w-full min-w-0">
-        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[34px] sm:min-h-[38px] mb-1 leading-snug break-words">
+        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 min-h-[34px] sm:min-h-[38px] mb-1.5 leading-snug break-words">
           {productName}
         </h3>
-        
-        {/* السعر والعملة بشكل صحيح */}
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+
+        {/* Formatted Price with Thousand Separators */}
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap tabular-nums">
           {discount > 0 ? (
             <>
-              <span className="text-xs sm:text-sm font-bold text-red-600">
-                {finalPrice.toFixed(2)} {currencySymbol}
+              <span className="text-xs sm:text-sm font-bold text-red-600" dir="ltr">
+                {formatPrice(finalPrice)} {currencySymbol}
               </span>
-              <span className="text-[10px] text-gray-400 line-through">
-                {originalPrice.toFixed(2)} {currencySymbol}
+              <span className="text-[10px] text-gray-400 line-through" dir="ltr">
+                {formatPrice(originalPrice)} {currencySymbol}
               </span>
             </>
           ) : (
-            <span className="text-xs sm:text-sm font-bold text-gray-900">
-              {finalPrice > 0 ? `${finalPrice.toFixed(2)} ${currencySymbol}` : 'شاهد السعر'}
+            <span className="text-xs sm:text-sm font-bold text-gray-900" dir="ltr">
+              {finalPrice > 0 ? `${formatPrice(finalPrice)} ${currencySymbol}` : t('View Price')}
             </span>
           )}
         </div>
@@ -162,9 +274,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-1 w-full min-w-0">
             <User size={11} className="text-gray-400 shrink-0" />
             <span className="truncate w-full">
-              {isExternal ? 'المتجر: ' : 'Seller: '}
+              {isExternal ? `${t('Store:')} ` : `${t('Seller:')} `}
               <strong className="text-gray-700 font-medium">
-                {product.sellerName || product.storeName || 'Anonymous'}
+                {detectedStore || product.sellerName || product.storeName || 'Jaknooma'}
               </strong>
             </span>
           </div>
@@ -172,21 +284,23 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-1 w-full min-w-0">
             <MapPin size={11} className="text-gray-400 shrink-0" />
             <span className="truncate w-full">
-              Loc: <strong className="text-gray-700 font-medium">{product.location || (isExternal ? 'شحن دولي' : 'Not specified')}</strong>
+              {t('Loc:')} <strong className="text-gray-700 font-medium">{cityLocation}</strong>
             </span>
           </div>
 
-          {isExternal ? (
-            <div className="mt-1.5 w-full flex items-center justify-center gap-1 py-1.5 px-2 bg-black hover:bg-gray-800 text-white rounded-xl font-semibold text-[11px] transition-colors shadow-xs">
+          {isExternal && targetExternalUrl ? (
+            <div className="mt-1.5 w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-black hover:bg-gray-800 text-white rounded-xl font-semibold text-[11px] transition-colors shadow-xs">
               <ShoppingBag size={11} className="text-[#D4AF37] shrink-0" />
-              <span className="truncate">شراء من {product.storeName || 'المتجر'}</span>
-              <ExternalLink size={10} className="shrink-0 ml-0.5" />
+              <span className="truncate">
+                {t('Buy from')} {detectedStore || product.storeName}
+              </span>
+              <ExternalLink size={10} className="shrink-0" />
             </div>
           ) : (
             <div className="flex items-center gap-1 mt-0.5 w-full min-w-0">
               <Calendar size={11} className="text-gray-400 shrink-0" />
               <span className="truncate">
-                Posted: <strong className="text-gray-700 font-medium">{formatDate(product.createdAt)}</strong>
+                {t('Posted:')} <strong className="text-gray-700 font-medium">{formatDate(product.createdAt)}</strong>
               </span>
             </div>
           )}
@@ -197,11 +311,11 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <div className="group flex flex-col relative w-full bg-white rounded-2xl p-2 sm:p-2.5 shadow-sm border border-gray-100 hover:shadow-md transition-all box-border">
-      {isExternal ? (
-        <a 
-          href={product.externalUrl || '#'} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+      {isExternal && targetExternalUrl ? (
+        <a
+          href={targetExternalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex flex-col w-full"
         >
           {cardBody}
@@ -215,14 +329,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   );
 }
 
-function SafeImage({ src, alt }: { src: string; alt: string }) {
+function SafeImage({ src, alt, unavailableText }: { src: string; alt: string; unavailableText: string }) {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
     return (
       <div className="flex flex-col items-center justify-center w-full h-full text-gray-400 gap-1 bg-gray-50">
         <ImageOff size={18} />
-        <span className="text-[9px]">غير متوفرة</span>
+        <span className="text-[9px]">{unavailableText}</span>
       </div>
     );
   }
@@ -231,6 +345,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
     <img
       src={src}
       alt={alt}
+      referrerPolicy="no-referrer"
       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       onError={() => setHasError(true)}
     />

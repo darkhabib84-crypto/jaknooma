@@ -19,6 +19,7 @@ import AdminUsers from './components/admin/AdminUsers';
 import AdminAnalytics from './components/admin/AdminAnalytics';
 import AdminSearch from './components/admin/AdminSearch';
 import AdminSettings from './components/admin/AdminSettings';
+import AdminLanguages from './components/admin/AdminLanguages';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UIProvider } from './contexts/UIContext';
 import AuthModal from './components/AuthModal';
@@ -33,11 +34,7 @@ import CartDrawer from './components/CartDrawer';
 import ApiMonitoring from './components/admin/ApiMonitoring';
 import ProductDetails from './pages/ProductDetails';
 import Checkout from './pages/Checkout';
-
-// استيراد صفحة البائع المخصصة الجديدة
 import SellerProfile from './pages/SellerProfile';
-
-// استيراد الـ Hook المخصص لتتبع زوار موقعك "Jaknooma"
 import { usePageTracking } from './hooks/usePageTracking';
 
 function ScrollToTop() {
@@ -83,10 +80,10 @@ function AppContent() {
     <>
       <ScrollToTop />
       <Routes>
-        {/* المسارات الرئيسية مع الـ Layout */}
+        {/* Main Storefront Routes */}
         <Route element={<MainLayout />}>
           <Route path="/" element={
-            <div className="flex flex-col md:flex-row flex-1 min-h-screen relative w-full overflow-x-hidden">
+            <div className="flex flex-col lg:flex-row flex-1 min-h-screen relative w-full overflow-x-hidden">
               <Sidebar />
               <main className="flex-1 flex flex-col w-full relative z-0 outline-none min-w-0">
                 <Breadcrumbs />
@@ -97,8 +94,6 @@ function AppContent() {
           } />
           
           <Route path="/product/:id" element={<ProductDetails />} />
-          
-          {/* مسارات صفحة البائع ومتجر الخارجية */}
           <Route path="/store/:sellerId" element={<SellerProfile />} />
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
 
@@ -110,11 +105,10 @@ function AppContent() {
           <Route path="/login" element={<AuthRedirect mode="login" />} />
           <Route path="/register" element={<AuthRedirect mode="signup" />} />
           <Route path="/forgot-password" element={<AuthRedirect mode="login" />} />
-          <Route path="/admin/monitoring" element={<ApiMonitoring />} />
           <Route path="/checkout" element={<Checkout />} />
         </Route>
 
-        {/* مسارات الأدمن المنفصلة */}
+        {/* Admin Dashboard Routes (All unified under AdminLayout) */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<DashboardHome />} />
           <Route path="stores" element={<AdminStoreManager />} />
@@ -123,8 +117,9 @@ function AppContent() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="search" element={<AdminSearch />} />
+          <Route path="monitoring" element={<ApiMonitoring />} />
+          <Route path="languages" element={<AdminLanguages />} />
           <Route path="settings" element={<AdminSettings />} />
-          <Route path="languages" element={<AdminSettings />} />
         </Route>
       </Routes>
       <Toaster position="bottom-center" toastOptions={{ style: { background: '#111', color: '#fff', borderRadius: '100px', fontSize: '14px', fontWeight: '500' } }} />

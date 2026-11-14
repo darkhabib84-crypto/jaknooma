@@ -3,10 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
-  User, 
   Phone, 
   MapPin, 
-  Calendar, 
   Star, 
   ArrowLeft, 
   Store, 
@@ -15,11 +13,15 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import { useCart } from '../contexts/CartContext';
+import { useTranslation } from 'react-i18next';
+import { formatPrice, isRtlLanguage } from '../lib/i18n';
 
 export default function SellerProfile() {
-  const { sellerId } = useParams<{ sellerId: string }>(); // 👈 التقط Parameter التاجر
+  const { sellerId } = useParams<{ sellerId: string }>();
   const navigate = useNavigate();
   const { addToCart } = useCart();
+  const { t, i18n } = useTranslation();
+  const isRtl = isRtlLanguage(i18n.language);
 
   const [seller, setSeller] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -31,7 +33,6 @@ export default function SellerProfile() {
       setLoading(true);
 
       try {
-        // 1. جلب بيانات التاجر من Firebase
         let userSnap = await getDoc(doc(db, 'users', sellerId));
         if (!userSnap.exists()) {
           userSnap = await getDoc(doc(db, 'stores', sellerId));
@@ -41,7 +42,6 @@ export default function SellerProfile() {
           setSeller({ id: userSnap.id, ...userSnap.data() });
         }
 
-        // 2. جلب كافة منتجات التاجر
         const q = query(
           collection(db, 'products'),
           where('sellerId', '==', sellerId)
@@ -65,33 +65,31 @@ export default function SellerProfile() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
+      <div dir={isRtl ? 'rtl' : 'ltr'} className="flex flex-col items-center justify-center min-h-screen bg-white">
         <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="font-bold text-gray-600">جاري تحميل صفحة البائع...</p>
+        <p className="font-bold text-gray-600">{t('Processing...')}</p>
       </div>
     );
   }
 
-  const sellerName = seller?.displayName || seller?.storeName || seller?.name || 'متجر غير معنون';
+  const sellerName = seller?.displayName || seller?.storeName || seller?.name || 'Jaknooma Seller';
   const sellerAvatar = seller?.photoURL || seller?.avatar || null;
 
   return (
-    <div className="flex w-full min-h-screen bg-[#FAFAFA]">
-      <div className="hidden md:block w-64 border-l border-gray-100 h-screen sticky top-0 shrink-0 overflow-hidden bg-white">
-        <Sidebar />
-      </div>
+    <div dir={isRtl ? 'rtl' : 'ltr'} className="flex w-full min-h-screen bg-[#FAFAFA]">
+      <Sidebar drawerOnly={true} />
 
-      <main className="flex-1 p-6 md:p-10" dir="rtl">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 max-w-6xl mx-auto w-full">
         <button 
           onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium"
+          className="flex items-center gap-2 mb-6 text-gray-500 hover:text-black transition-colors font-medium cursor-pointer"
         >
-          <ArrowLeft size={18} className="rotate-180" /> العودة
+          <ArrowLeft size={18} className={isRtl ? 'rotate-180' : ''} />
+          <span>{t('Back')}</span>
         </button>
 
-        {/* كارت معلومات البائع الهيدر */}
         <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm mb-10">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-right">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-start">
             {sellerAvatar ? (
               <img src={sellerAvatar} className="w-24 h-24 rounded-2xl object-cover border border-gray-100 shadow-sm" alt={sellerName} />
             ) : (
@@ -107,13 +105,12 @@ export default function SellerProfile() {
                 <div className="flex items-center gap-1 text-amber-400">
                   <Star size={16} fill="currentColor" />
                   <span className="font-bold text-gray-800">5.0</span>
-                  <span className="text-gray-400">(تقييمات المتجر)</span>
                 </div>
 
                 {seller?.phone && (
                   <div className="flex items-center gap-1">
                     <Phone size={15} className="text-emerald-600" />
-                    <a href={`tel:${seller.phone}`} className="dir-ltr hover:underline font-semibold text-gray-700">{seller.phone}</a>
+                    <a href={`tel:${seller.phone}`} dir="ltr" className="hover:underline font-semibold text-gray-700">{seller.phone}</a>
                   </div>
                 )}
 
@@ -125,24 +122,26 @@ export default function SellerProfile() {
                 )}
               </div>
 
-              <p className="text-gray-600 text-sm max-w-2xl">{seller?.bio || 'أهلاً بكم في متجري المخصص، يمكنك استعراض كافة المنتجات والتواصل المباشر لشراء الإعلانات.'}</p>
+              <p className="text-gray-600 text-sm max-w-2xl">
+                {seller?.bio || (isRtl ? 'أهلاً بكم في متجري المخصص، يمكنك استعراض كافة المنتجات والتواصل المباشر لشراء الإعلانات.' : 'Welcome to our official store profile on Jaknooma.')}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* شبكة جميع منتجات التاجر */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Package size={24} /> جميع إعلانات البائع ({products.length})
+            <Package size={24} />
+            <span>{isRtl ? `جميع إعلانات البائع (${products.length})` : `Seller Listings (${products.length})`}</span>
           </h2>
 
           {products.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
               <Package size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500 font-bold">لا توجد منتجات مضافة لهذا البائع حالياً.</p>
+              <p className="text-gray-500 font-bold">{t('No results found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
               {products.map((prod) => {
                 const img = Array.isArray(prod.images) ? prod.images[0] : (prod.imageUrl || prod.images || '/placeholder.png');
                 return (
@@ -152,8 +151,8 @@ export default function SellerProfile() {
                     onClick={() => navigate(`/product/${prod.id}`)}
                   >
                     <div>
-                      <div className="w-full h-48 bg-gray-50 overflow-hidden">
-                        <img src={img} alt={prod.name} className="w-full h-full object-contain p-3 hover:scale-105 transition-transform" />
+                      <div className="w-full h-48 bg-gray-50 overflow-hidden flex items-center justify-center">
+                        <img src={img} alt={prod.name} className="w-full h-full object-contain mx-auto p-3 hover:scale-105 transition-transform" />
                       </div>
                       <div className="p-4">
                         <h3 className="font-bold text-gray-900 line-clamp-1 mb-1">{prod.name}</h3>
@@ -162,13 +161,16 @@ export default function SellerProfile() {
                     </div>
 
                     <div className="p-4 pt-0 flex items-center justify-between border-t border-gray-50 mt-auto">
-                      <span className="font-extrabold text-green-600">{prod.price} {prod.currency || 'AED'}</span>
+                      <span className="font-extrabold text-emerald-600 tabular-nums" dir="ltr">
+                        {formatPrice(prod.price)} {prod.currency || 'AED'}
+                      </span>
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           addToCart(prod);
                         }}
-                        className="p-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors"
+                        className="p-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors cursor-pointer"
+                        title={t('Add to Cart')}
                       >
                         <ShoppingCart size={16} />
                       </button>

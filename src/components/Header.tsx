@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { ShoppingBag, Search, Menu, LogOut, X, Globe, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '../contexts/CartContext';
+import { isRtlLanguage } from '../lib/i18n';
 
 import StoreFilter from './StoreFilter';
 import { Logo } from './Logo';
@@ -13,12 +14,10 @@ export default function Header() {
   const { user, isAdmin, openAuthModal, logout } = useAuth();
   const { setCartOpen, isMobileMenuOpen, setMobileMenuOpen, searchQuery, setSearchQuery } = useUI();
   const navigate = useNavigate();
-  const location = useLocation();
   const { t, i18n } = useTranslation();
   const [isLangMenuOpen, setLangMenuOpen] = useState(false);
   const { cart } = useCart();
 
-  // تنفيذ عملية البحث عند النقر على الزر أو الضغط على Enter
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
@@ -30,58 +29,72 @@ export default function Header() {
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
-    document.documentElement.dir = ['ar', 'ur'].includes(lng) ? 'rtl' : 'ltr';
+    document.documentElement.dir = isRtlLanguage(lng) ? 'rtl' : 'ltr';
+    document.documentElement.lang = lng;
     setLangMenuOpen(false);
   };
 
-  const languages = [
-    { code: 'en', name: 'English' },
-    { code: 'zh', name: 'Chinese' },
-    { code: 'es', name: 'Spanish' },
-    { code: 'fr', name: 'French' },
-    { code: 'ar', name: 'Arabic' },
-    { code: 'hi', name: 'Hindi' },
-    { code: 'ur', name: 'Urdu' },
+  const allLanguages = [
+    { code: 'ar', label: 'العربية' },
+    { code: 'en', label: 'English' },
+    { code: 'zh', label: '中文' },
+    { code: 'es', label: 'Español' },
+    { code: 'fr', label: 'Français' },
+    { code: 'hi', label: 'हिन्दी' },
+    { code: 'ur', label: 'اردو' },
   ];
 
-  const isRtl = ['ar', 'ur'].includes(i18n.language);
+  const languages = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('jaknooma_languages_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const enabledCodes = new Set(parsed.filter((l: any) => l.enabled !== false).map((l: any) => l.code));
+          const filtered = allLanguages.filter(l => enabledCodes.has(l.code));
+          if (filtered.length > 0) return filtered;
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return allLanguages;
+  }, [isLangMenuOpen]);
+
+  const isRtl = isRtlLanguage(i18n.language);
 
   return (
-    <header dir="ltr" className="sticky top-0 z-[60] w-full border-b border-gray-100 bg-white/80 backdrop-blur-md shrink-0">
-      <div className="flex h-16 items-center px-4 md:px-8 gap-4">
-        <button 
-          onClick={() => {
-            if (location.pathname !== '/') {
-              navigate('/');
-            } else {
-              setMobileMenuOpen(!isMobileMenuOpen);
-            }
-          }}
-          className="md:hidden p-2 -ml-2 text-gray-800 hover:text-black transition-colors"
-          aria-label="Toggle menu"
-        >
-          {location.pathname !== '/' ? <Menu className="h-6 w-6" /> : (isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />)}
-        </button>
-        
-        <Logo onClick={() => setMobileMenuOpen(false)} />
+    <header dir={isRtl ? 'rtl' : 'ltr'} className="sticky top-0 z-[60] w-full border-b border-gray-100 bg-white/90 backdrop-blur-md shrink-0">
+      <div className="flex h-16 items-center justify-between px-4 md:px-8 gap-3">
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 -mx-1 text-gray-800 hover:text-black transition-colors rounded-lg hover:bg-gray-100"
+            aria-label={t('Categories')}
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+          
+          <Logo onClick={() => setMobileMenuOpen(false)} />
+        </div>
 
         {/* Desktop Search Bar with Dedicated Search Button */}
-        <div className="flex-1 max-w-2xl px-4 md:px-8 hidden md:block">
-          <form onSubmit={handleSearch} className="flex items-center gap-2 w-full max-w-lg ml-auto">
+        <div className="flex-1 max-w-2xl px-4 hidden md:block">
+          <form onSubmit={handleSearch} className="flex items-center gap-2 w-full max-w-lg mx-auto">
             <div className="relative flex-1">
               <input
                 type="text"
                 dir={isRtl ? 'rtl' : 'ltr'}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50/50 focus:bg-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all text-left rtl:text-right"
+                className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50/70 focus:bg-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all text-start"
                 placeholder={t('Search premium products...')}
               />
             </div>
             <button
               type="submit"
               disabled={!searchQuery.trim()}
-              className="flex items-center justify-center gap-1.5 px-5 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 shadow-sm"
+              className="flex items-center justify-center gap-1.5 px-5 py-2 bg-black text-white text-sm font-medium rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 shadow-sm cursor-pointer"
             >
               <Search className="h-4 w-4" />
               <span>{t('Search')}</span>
@@ -89,50 +102,59 @@ export default function Header() {
           </form>
         </div>
 
-        <div className="flex items-center gap-4 md:gap-6 ml-auto relative">
+        <div className="flex items-center gap-3 md:gap-5 shrink-0 relative">
           <div className="relative">
             <button 
               onClick={() => setLangMenuOpen(!isLangMenuOpen)}
-              className="p-2 text-gray-600 hover:text-black transition-colors flex items-center gap-1 shrink-0"
+              className="p-2 text-gray-600 hover:text-black transition-colors flex items-center gap-1.5 shrink-0 rounded-full hover:bg-gray-100 cursor-pointer"
               title={t('Language')}
             >
               <Globe className="w-5 h-5" />
+              <span className="text-xs font-semibold uppercase hidden sm:inline">
+                {(i18n.language || 'ar').split('-')[0]}
+              </span>
             </button>
             {isLangMenuOpen && (
-              <div className="absolute top-full right-0 mt-2 w-36 bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden py-1 z-50">
-                {languages.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => changeLanguage(lang.code)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-black transition-colors"
-                  >
-                    {t(lang.name)}
-                  </button>
-                ))}
+              <div className={`absolute top-full ${isRtl ? 'left-0' : 'right-0'} mt-2 w-40 bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden py-1.5 z-50`}>
+                {languages.map((lang) => {
+                  const active = (i18n.language || '').startsWith(lang.code);
+                  return (
+                    <button
+                      key={lang.code}
+                      onClick={() => changeLanguage(lang.code)}
+                      className={`w-full text-start px-4 py-2 text-sm transition-colors flex items-center justify-between cursor-pointer ${
+                        active ? 'bg-gray-100 text-black font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-black'
+                      }`}
+                    >
+                      <span>{lang.label}</span>
+                      {active && <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
           
           <a 
             href="mailto:jaknooma@gmail.com" 
-            className="text-sm font-medium text-gray-600 hover:text-black transition-colors hidden lg:block"
+            className="text-sm font-medium text-gray-600 hover:text-black transition-colors hidden lg:block whitespace-nowrap"
           >
             {t('Support')}
           </a>          
           
           {user ? (
-            <div className="flex items-center gap-3 md:gap-4">
+            <div className="flex items-center gap-2.5 md:gap-4">
               {isAdmin && (
                 <Link 
                   to="/admin/stores"
-                  className="text-xs font-bold uppercase tracking-widest text-[#D4AF37] px-3 py-1.5 rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-colors"
+                  className="text-xs font-bold uppercase tracking-widest text-[#D4AF37] px-3 py-1.5 rounded-full border border-[#D4AF37]/20 bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-colors whitespace-nowrap"
                 >
                   {t('Admin')}
                 </Link>
               )}
               <Link 
                 to="/add-product"
-                className="text-sm font-medium text-white px-4 py-2 rounded-full bg-black hover:bg-gray-800 transition-colors hidden sm:flex items-center gap-1.5 shadow-sm"
+                className="text-sm font-medium text-white px-4 py-2 rounded-full bg-black hover:bg-gray-800 transition-colors hidden sm:flex items-center gap-1.5 shadow-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
                 {t('Add Product')}
@@ -142,8 +164,8 @@ export default function Header() {
                   logout();
                   setMobileMenuOpen(false);
                 }}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors hidden sm:block"
-                title="Log Out"
+                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors hidden sm:block cursor-pointer"
+                title={t('Log Out')}
               >
                 <LogOut className="w-5 h-5" />
               </button>
@@ -167,7 +189,7 @@ export default function Header() {
                    openAuthModal('login');
                    setMobileMenuOpen(false);
                 }}
-                className="text-sm font-medium text-black px-4 py-1.5 lg:py-2 hover:bg-gray-200 rounded-full transition-colors whitespace-nowrap"
+                className="text-sm font-medium text-black px-4 py-1.5 lg:py-2 hover:bg-gray-200 rounded-full transition-colors whitespace-nowrap cursor-pointer"
               >
                 {t('Log in')}
               </button>
@@ -176,7 +198,7 @@ export default function Header() {
                    openAuthModal('signup');
                    setMobileMenuOpen(false);
                 }}
-                className="text-sm font-bold text-white px-5 py-1.5 lg:py-2 rounded-full bg-black hover:bg-gray-800 transition-colors whitespace-nowrap shadow-sm"
+                className="text-sm font-bold text-white px-5 py-1.5 lg:py-2 rounded-full bg-black hover:bg-gray-800 transition-colors whitespace-nowrap shadow-sm cursor-pointer"
               >
                 {t('Sign up')}
               </button>
@@ -185,8 +207,8 @@ export default function Header() {
 
           <button
             onClick={() => setCartOpen(true)}
-            className="relative p-2 text-[#D4AF37] hover:text-black transition-colors shrink-0"
-            aria-label="Open cart"
+            className="relative p-2 text-[#D4AF37] hover:text-black transition-colors shrink-0 cursor-pointer"
+            aria-label={t('Your Cart')}
           >
             <ShoppingBag className="w-5 h-5" />
             {cart.length > 0 && (
@@ -199,7 +221,7 @@ export default function Header() {
       </div>
       
       {/* Mobile Search Bar with Dedicated Search Button */}
-      <div className="md:hidden px-4 pb-3 border-t border-gray-100 pt-3">
+      <div className="md:hidden px-4 pb-3 border-t border-gray-100 pt-2.5">
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full">
           <div className="relative flex-1">
             <input
@@ -207,17 +229,18 @@ export default function Header() {
               dir={isRtl ? 'rtl' : 'ltr'}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-stone-300 transition-all text-left rtl:text-right"
+              className="block w-full rounded-full border border-gray-200 py-2 px-4 text-sm text-black placeholder-gray-400 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-stone-300 transition-all text-start"
               placeholder={t('Search products...')}
             />
           </div>
           <button
             type="submit"
             disabled={!searchQuery.trim()}
-            className="flex items-center justify-center p-2.5 bg-black text-white rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold rounded-full hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0"
             aria-label={t('Search')}
           >
             <Search className="h-4 w-4" />
+            <span>{t('Search')}</span>
           </button>
         </form>
       </div>
