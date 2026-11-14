@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { DollarSign, TrendingUp, TrendingDown, Store } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useTranslation } from 'react-i18next';
 import { formatPrice, isRtlLanguage } from '../../lib/i18n';
+import {
+  calculateCompletedRevenue,
+  isCompletedPayment,
+  getPaymentTimestampMs,
+} from '../AdminPayments';
 
 const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
   <motion.div
@@ -32,32 +37,71 @@ const StatCard = ({ title, value, change, icon: Icon, trend }: any) => (
 );
 
 export default function DashboardHome() {
-  const [data, setData] = useState<any[]>([]);
+  const [totalRevenue, setTotalRevenue] = useState<number>(0);
+  const [totalProducts, setTotalProducts] = useState<number>(0);
+  const [chartData, setChartData] = useState<Array<{ name: string; revenue: number }>>([]);
   const { t, i18n } = useTranslation();
   const isRtl = isRtlLanguage(i18n.language);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        const fetchedData = querySnapshot.docs.map(doc => {
-          const d = doc.data();
-          const title = d.name || d.title || 'Item';
+    // 1. Fetch total products count ONLY (never sum product prices as revenue)
+    getDocs(collection(db, 'products'))
+      .then((snap) => {
+        setTotalProducts(snap.size);
+      })
+      .catch((error) => {
+        console.error('Error fetching products count:', error);
+      });
+
+    // 2. Subscribe to actual completed payment transactions (identical to Revenue & Payments page)
+    const unsubscribe = onSnapshot(
+      collection(db, 'payments'),
+      (snapshot) => {
+        const rawPayments = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as any),
+        }));
+
+        const completedRevenue = calculateCompletedRevenue(rawPayments);
+        setTotalRevenue(completedRevenue);
+
+        // Build chronological chart data strictly from completed transactions
+        const completedChronological = rawPayments
+          .filter(isCompletedPayment)
+          .sort((a, b) => getPaymentTimestampMs(a.createdAt) - getPaymentTimestampMs(b.createdAt));
+
+        const points = completedChronological.map((p, idx) => {
+          const ms = getPaymentTimestampMs(p.createdAt);
+          let label = `#${idx + 1}`;
+          if (ms > 0) {
+            const d = new Date(ms);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            label = `${day}/${month}`;
+          } else if (p.productName || p.type) {
+            label = String(p.productName || p.type).substring(0, 10);
+          }
           return {
-            name: title.substring(0, 8),
-            revenue: parseFloat(d.price) || 0,
-            searches: 100
+            name: label,
+            revenue: Number(p.amount) || 0,
           };
         });
-        setData(fetchedData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
-    fetchData();
-  }, []);
 
-  const totalValue = data.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
+        if (points.length === 0) {
+          setChartData([{ name: '01/01', revenue: 0 }]);
+        } else if (points.length === 1) {
+          setChartData([{ name: isRtl ? 'البداية' : 'Start', revenue: 0 }, points[0]]);
+        } else {
+          setChartData(points);
+        }
+      },
+      (error) => {
+        console.error('Error fetching payment revenue:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isRtl]);
 
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -71,14 +115,14 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title={t('Total Revenue')} 
-          value={`${formatPrice(totalValue)} AED`} 
+          value={`${formatPrice(totalRevenue)} AED`} 
           change="0" 
           trend="up" 
           icon={DollarSign} 
         />
         <StatCard 
           title={t('Total Products')} 
-          value={formatPrice(data.length)} 
+          value={formatPrice(totalProducts)} 
           change="0" 
           trend="up" 
           icon={Store} 
@@ -90,7 +134,7 @@ export default function DashboardHome() {
           <h3 className="font-bold text-lg mb-6">{t('Revenue Overview')}</h3>
           <div className="h-[300px] w-full" dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                 <YAxis
@@ -100,7 +144,7 @@ export default function DashboardHome() {
                   tickFormatter={(val) => `${formatPrice(val)}`}
                 />
                 <Tooltip
-                  formatter={(value: any) => [`${formatPrice(value)} AED`, isRtl ? 'القيمة (AED)' : 'Value (AED)']}
+                  formatter={(value: any) => [`${formatPrice(value)} AED`, isRtl ? 'الإيراد (AED)' : 'Revenue (AED)']}
                 />
                 <Area type="monotone" dataKey="revenue" stroke="#000" fill="#D4AF37" fillOpacity={0.18} />
               </AreaChart>

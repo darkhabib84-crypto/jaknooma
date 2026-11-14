@@ -24,6 +24,31 @@ interface Payment {
   createdAt: any;
 }
 
+export const isCompletedPayment = (p: { status?: string }): boolean => {
+  const status = String(p?.status || 'completed').trim().toLowerCase();
+  return status === 'completed' || status === 'succeeded' || status === 'paid' || status === 'success';
+};
+
+export const calculateCompletedRevenue = (items: Array<{ amount?: any; status?: string }>): number => {
+  return items.reduce((sum, item) => {
+    if (!isCompletedPayment(item)) return sum;
+    const amount = Number(item.amount);
+    return sum + (Number.isFinite(amount) && amount > 0 ? amount : 0);
+  }, 0);
+};
+
+export const getPaymentTimestampMs = (createdAt: any): number => {
+  if (!createdAt) return 0;
+  try {
+    if (typeof createdAt.toDate === 'function') return createdAt.toDate().getTime();
+    if (typeof createdAt.seconds === 'number') return createdAt.seconds * 1000;
+    const d = new Date(createdAt).getTime();
+    return Number.isFinite(d) ? d : 0;
+  } catch {
+    return 0;
+  }
+};
+
 export default function AdminPayments() {
   const { user, isAdmin } = useAuth();
   const { t, i18n } = useTranslation();
@@ -55,20 +80,20 @@ export default function AdminPayments() {
   useEffect(() => {
     if (!isAdmin) return;
 
-    const q = query(
+    const unsubscribe = onSnapshot(
       collection(db, 'payments'),
-      orderBy('createdAt', 'desc'),
-      limit(100)
+      (snapshot) => {
+        const data = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Payment))
+          .sort((a, b) => getPaymentTimestampMs(b.createdAt) - getPaymentTimestampMs(a.createdAt));
+        setPayments(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching payments:', error);
+        setLoading(false);
+      }
     );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
-      setPayments(data);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching payments:', error);
-      setLoading(false);
-    });
 
     return () => unsubscribe();
   }, [isAdmin]);
@@ -81,13 +106,9 @@ export default function AdminPayments() {
   const formatCleanPaymentDate = (createdAt: any): string => {
     if (!createdAt) return '—';
     try {
-      const date: Date =
-        typeof createdAt.toDate === 'function'
-          ? createdAt.toDate()
-          : createdAt.seconds
-          ? new Date(createdAt.seconds * 1000)
-          : new Date(createdAt);
-
+      const ms = getPaymentTimestampMs(createdAt);
+      if (!ms) return '—';
+      const date = new Date(ms);
       if (isNaN(date.getTime())) return '—';
 
       const day = String(date.getDate()).padStart(2, '0');
@@ -129,7 +150,8 @@ export default function AdminPayments() {
     );
   });
 
-  const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const completedPayments = payments.filter(isCompletedPayment);
+  const totalRevenue = calculateCompletedRevenue(payments);
 
   return (
     <div dir={isRtl ? 'rtl' : 'ltr'} className="flex-1 bg-[#FAFAFA] min-h-[calc(100vh-64px)] overflow-y-auto w-full relative z-0">
@@ -153,7 +175,7 @@ export default function AdminPayments() {
             <span className="text-sm font-medium text-gray-500 mb-1">{t('Total Transactions')}</span>
             <div className="text-3xl sm:text-4xl font-bold text-black flex items-center gap-2 tabular-nums">
               <CreditCard className="w-6 h-6 text-[#D4AF37]" />
-              <span>{formatPrice(payments.length)}</span>
+              <span>{formatPrice(completedPayments.length)}</span>
             </div>
           </div>
         </div>
