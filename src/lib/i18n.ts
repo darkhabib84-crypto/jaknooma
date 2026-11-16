@@ -270,7 +270,8 @@ const resources = {
       "Product published successfully!": "Product published successfully!",
       "Product published! Please complete the payment to activate VIP:": "Product published! Please complete the payment to activate VIP:",
       "Click here to pay now": "Click here to pay now",
-      "An error occurred while publishing": "An error occurred while publishing"
+      "An error occurred while publishing": "An error occurred while publishing",
+      "Reports & Moderation": "Reports & Moderation"
     }
   },
   ar: {
@@ -524,7 +525,8 @@ const resources = {
       "Product published successfully!": "تم نشر الإعلان بنجاح!",
       "Product published! Please complete the payment to activate VIP:": "تم نشر الإعلان! يرجى إتمام الدفع لتفعيل باقة VIP:",
       "Click here to pay now": "اضغط هنا للدفع الآن",
-      "An error occurred while publishing": "حدث خطأ أثناء نشر الإعلان"
+      "An error occurred while publishing": "حدث خطأ أثناء نشر الإعلان",
+      "Reports & Moderation": "البلاغات والحظر"
     }
   },
   fr: {

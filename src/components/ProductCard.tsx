@@ -4,6 +4,7 @@ import { MapPin, User, Calendar, ExternalLink, ImageOff, ShoppingBag, Plus } fro
 import { useTranslation } from 'react-i18next';
 import { formatPrice, isRtlLanguage } from '../lib/i18n';
 import { useCart } from '../contexts/CartContext';
+import ReportListingModal from './ReportListingModal';
 
 export interface Product {
   id: string;
@@ -99,6 +100,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { t, i18n } = useTranslation();
   const { addToCart } = useCart();
   const isRtl = isRtlLanguage(i18n.language);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   if (!product) return null;
 
@@ -271,14 +273,28 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         <div className="pt-2 border-t border-gray-100 flex flex-col gap-1.5 text-[10px] sm:text-[11px] text-gray-500 w-full min-w-0">
-          <div className="flex items-center gap-1 w-full min-w-0">
-            <User size={11} className="text-gray-400 shrink-0" />
-            <span className="truncate w-full">
-              {isExternal ? `${t('Store:')} ` : `${t('Seller:')} `}
-              <strong className="text-gray-700 font-medium">
-                {detectedStore || product.sellerName || product.storeName || 'Jaknooma'}
-              </strong>
-            </span>
+          <div className="flex items-center justify-between gap-1 w-full min-w-0">
+            <div className="flex items-center gap-1 min-w-0 flex-1">
+              <User size={11} className="text-gray-400 shrink-0" />
+              <span className="truncate w-full">
+                {isExternal ? `${t('Store:')} ` : `${t('Seller:')} `}
+                <strong className="text-gray-700 font-medium">
+                  {detectedStore || product.sellerName || product.storeName || 'Jaknooma'}
+                </strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsReportModalOpen(true);
+              }}
+              title={isRtl ? 'إبلاغ عن الإعلان' : 'Report Listing'}
+              className="text-[9px] sm:text-[10px] font-semibold text-gray-400 hover:text-red-600 transition-colors shrink-0 px-1 py-0.5 rounded hover:bg-red-50 cursor-pointer"
+            >
+              {isRtl ? '🚩 إبلاغ' : '🚩 Report'}
+            </button>
           </div>
 
           <div className="flex items-center gap-1 w-full min-w-0">
@@ -325,6 +341,11 @@ export default function ProductCard({ product }: ProductCardProps) {
           {cardBody}
         </Link>
       )}
+      <ReportListingModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        product={product}
+      />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import AdminAnalytics from './components/admin/AdminAnalytics';
 import AdminSearch from './components/admin/AdminSearch';
 import AdminSettings from './components/admin/AdminSettings';
 import AdminLanguages from './components/admin/AdminLanguages';
+import AdminReports from './components/admin/AdminReports';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UIProvider } from './contexts/UIContext';
 import AuthModal from './components/AuthModal';
@@ -129,6 +130,7 @@ function AppContent() {
           <Route path="stores" element={<AdminStoreManager />} />
           <Route path="payments" element={<AdminPayments />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="reports" element={<AdminReports />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="search" element={<AdminSearch />} />

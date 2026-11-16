@@ -6,12 +6,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useCart } from '../contexts/CartContext';
 import { isRtlLanguage } from '../lib/i18n';
+import toast from 'react-hot-toast';
 
 import StoreFilter from './StoreFilter';
 import { Logo } from './Logo';
 
 export default function Header() {
-  const { user, isAdmin, openAuthModal, logout } = useAuth();
+  const { user, isAdmin, isBanned, openAuthModal, logout } = useAuth();
   const { setCartOpen, isMobileMenuOpen, setMobileMenuOpen, searchQuery, setSearchQuery } = useUI();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
@@ -154,6 +155,16 @@ export default function Header() {
               )}
               <Link 
                 to="/add-product"
+                onClick={(e) => {
+                  if (isBanned) {
+                    e.preventDefault();
+                    toast.error(
+                      isRtl
+                        ? 'تم إيقاف حسابك من قبل الإدارة لمخالفة شروط الاستخدام'
+                        : 'Your account has been suspended by administration for violating the Terms of Use'
+                    );
+                  }
+                }}
                 className="text-sm font-medium text-white px-4 py-2 rounded-full bg-black hover:bg-gray-800 transition-colors hidden sm:flex items-center gap-1.5 shadow-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />

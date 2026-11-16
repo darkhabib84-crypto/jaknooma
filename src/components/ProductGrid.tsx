@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useTranslation } from 'react-i18next';
+import { isSellerOrProductHidden, MODERATION_EVENT } from '../services/moderationService';
 
 interface ProductGridProps {
   filteredProducts?: Product[];
@@ -24,6 +25,7 @@ export default function ProductGrid(props: ProductGridProps) {
   const [fetchedProducts, setFetchedProducts] = useState<Product[]>([]);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [internalVisibleCount, setInternalVisibleCount] = useState(12);
+  const [, setModerationTick] = useState(0);
 
   const visibleCount = props.visibleCount !== undefined ? props.visibleCount : internalVisibleCount;
   const setVisibleCount = props.setVisibleCount || setInternalVisibleCount;
@@ -32,6 +34,12 @@ export default function ProductGrid(props: ProductGridProps) {
   const currentSub = searchParams.get('sub') || searchParams.get('brand') || '';
   const searchQuery = searchParams.get('q') || '';
   const selectedStores = searchParams.getAll('store').map((s) => s.toLowerCase());
+
+  useEffect(() => {
+    const onModUpdate = () => setModerationTick((v) => v + 1);
+    window.addEventListener(MODERATION_EVENT, onModUpdate);
+    return () => window.removeEventListener(MODERATION_EVENT, onModUpdate);
+  }, []);
 
   useEffect(() => {
     if (!props.filteredProducts) {
@@ -58,7 +66,7 @@ export default function ProductGrid(props: ProductGridProps) {
   const rawProducts = props.filteredProducts || fetchedProducts;
   const isLoading = props.loading !== undefined ? props.loading : fetchLoading;
 
-  const finalProducts = props.filteredProducts ? props.filteredProducts : rawProducts.filter(product => {
+  const finalProducts = (props.filteredProducts ? props.filteredProducts : rawProducts.filter(product => {
     if (selectedStores.length > 0) {
       const detected = (detectProductStoreName(product) || '').toLowerCase();
       const rawStore = ((product as any).storeId || product.storeName || '').toLowerCase();
@@ -89,7 +97,7 @@ export default function ProductGrid(props: ProductGridProps) {
       if (!title.includes(queryStr) && !desc.includes(queryStr)) return false;
     }
     return true;
-  });
+  })).filter((p) => !isSellerOrProductHidden(p as any));
 
   const imagesList = props.image || [];
 

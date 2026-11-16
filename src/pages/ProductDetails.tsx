@@ -26,6 +26,8 @@ import { useCart } from '../contexts/CartContext';
 import { useTranslation } from 'react-i18next';
 import { formatPrice, isRtlLanguage } from '../lib/i18n';
 import { detectProductStoreName, getCleanCityLocation } from '../components/ProductCard';
+import ReportListingModal from '../components/ReportListingModal';
+import { isSellerOrProductHidden } from '../services/moderationService';
 import toast from 'react-hot-toast';
 
 const ProductDetails = () => {
@@ -34,6 +36,7 @@ const ProductDetails = () => {
   const [product, setProduct] = useState<any>(null);
   const [sellerData, setSellerData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const { addToCart } = useCart();
   const { t, i18n } = useTranslation();
   const isRtl = isRtlLanguage(i18n.language);
@@ -113,7 +116,7 @@ const ProductDetails = () => {
     );
   }
 
-  if (!product) {
+  if (!product || isSellerOrProductHidden(product)) {
     return (
       <div dir={isRtl ? 'rtl' : 'ltr'} className="flex flex-col items-center justify-center min-h-screen bg-white p-6 text-center">
         <Package size={64} className="text-gray-300 mb-4" />
@@ -226,6 +229,13 @@ const ProductDetails = () => {
                       ) : (
                         <span className="text-sm font-bold text-gray-700 truncate block w-full">{sellerName}</span>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                      >
+                        <span>{isRtl ? '🚩 إبلاغ عن الإعلان' : '🚩 Report Listing'}</span>
+                      </button>
                     </div>
                   </div>
 
@@ -323,16 +333,39 @@ const ProductDetails = () => {
                   <span>{t('Add to Cart')}</span>
                 </button>
 
-                <button 
-                  onClick={handleShare} 
-                  className="flex items-center justify-center gap-2 w-full py-3 text-gray-500 font-semibold hover:text-black transition-all cursor-pointer"
-                >
-                  <Share2 size={18} />
-                  <span>{t('Share Product')}</span>
-                </button>
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button 
+                    onClick={handleShare} 
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 text-gray-500 font-semibold hover:text-black transition-all cursor-pointer text-xs sm:text-sm"
+                  >
+                    <Share2 size={16} />
+                    <span>{t('Share Product')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsReportModalOpen(true)}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-red-50/80 hover:bg-red-100 text-red-600 font-bold text-xs transition-all cursor-pointer border border-red-200/60"
+                  >
+                    <span>{isRtl ? '🚩 إبلاغ عن الإعلان' : '🚩 Report Listing'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+
+          <ReportListingModal
+            isOpen={isReportModalOpen}
+            onClose={() => setIsReportModalOpen(false)}
+            product={{
+              id: product.id || id || '',
+              name: product.name,
+              title: product.title,
+              images,
+              sellerId: targetSellerId || product.sellerId,
+              sellerName,
+            }}
+          />
 
           {/* Seller Store Card */}
           <div className="mt-14 w-full border-t border-gray-100 pt-10 box-border">

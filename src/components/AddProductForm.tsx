@@ -8,9 +8,12 @@ import { toast } from 'react-hot-toast';
 import { useCategories } from '../hooks/useCategories';
 import { useTranslation } from 'react-i18next';
 import { isRtlLanguage } from '../lib/i18n';
+import { isUserBannedSync } from '../services/moderationService';
+import { Ban } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function AddProductForm() {
-  const { user } = useAuth();
+  const { user, isBanned } = useAuth();
   const navigate = useNavigate();
   const { categories } = useCategories();
   const { t, i18n } = useTranslation();
@@ -28,6 +31,7 @@ export default function AddProductForm() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [customSubCategory, setCustomSubCategory] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // External store and logo fields
   const [externalStoreLink, setExternalStoreLink] = useState('');
@@ -112,9 +116,25 @@ export default function AddProductForm() {
   const isCarsCategory = selectedCategory === 'Cars & Automotive Brands';
   const isOtherSelected = selectedSubCategory === 'Other';
 
+  const userBanned = isBanned || isUserBannedSync(user?.uid, user?.email);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return toast.error(t('Please log in first'));
+    if (userBanned) {
+      return toast.error(
+        isRtl
+          ? 'تم إيقاف حسابك من قبل الإدارة لمخالفة شروط الاستخدام'
+          : 'Your account has been suspended by administration for violating the Terms of Use'
+      );
+    }
+    if (!agreedToTerms) {
+      return toast.error(
+        isRtl
+          ? 'يرجى الموافقة على شروط الاستخدام والتعهد بعدم نشر محتوى مخالف قبل النشر'
+          : 'Please agree to the Terms of Use before publishing'
+      );
+    }
     if (filesToUpload.length === 0) return toast.error(t('Please select at least one product image'));
     if (!location.trim()) return toast.error(t('Please specify your location'));
 
@@ -455,9 +475,41 @@ export default function AddProductForm() {
         </div>
       </div>
 
+      {/* Mandatory Terms of Use & Anti-Abuse Pledge Checkbox */}
+      <label className="flex items-start gap-3 p-4 rounded-2xl border border-gray-200 bg-gray-50/70 cursor-pointer hover:border-black transition-colors">
+        <input
+          type="checkbox"
+          checked={agreedToTerms}
+          onChange={(e) => setAgreedToTerms(e.target.checked)}
+          className="mt-0.5 w-5 h-5 rounded border-gray-300 accent-black cursor-pointer shrink-0"
+          required
+        />
+        <span className="text-xs sm:text-sm font-semibold text-gray-800 leading-relaxed">
+          {isRtl
+            ? 'أوافق على شروط الاستخدام وأتعهد بعدم نشر أي محتوى مسيء أو مخالف'
+            : 'I agree to the Terms of Use and pledge not to publish any offensive or violating content'}{' '}
+          (
+          <Link to="/terms" className="text-[#B8860B] underline hover:text-black">
+            {t('Terms & Conditions')}
+          </Link>
+          )
+        </span>
+      </label>
+
+      {userBanned && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-center gap-3 text-red-700 text-sm font-bold">
+          <Ban className="w-5 h-5 shrink-0" />
+          <span>
+            {isRtl
+              ? 'تم إيقاف حسابك من قبل الإدارة لمخالفة شروط الاستخدام'
+              : 'Your account has been suspended by administration for violating the Terms of Use'}
+          </span>
+        </div>
+      )}
+
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || userBanned}
         className="w-full py-4 bg-black text-white rounded-2xl font-bold hover:bg-gray-900 transition-colors cursor-pointer disabled:opacity-50"
       >
         {isSubmitting ? t('Publishing...') : t('Publish Product')}

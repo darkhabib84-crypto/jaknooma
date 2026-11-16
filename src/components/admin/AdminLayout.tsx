@@ -22,19 +22,22 @@ import {
   CheckCheck,
   UserPlus,
   PackagePlus,
-  Webhook
+  Webhook,
+  Flag
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { isRtlLanguage } from '../../lib/i18n';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { fetchAllReports, MODERATION_EVENT } from '../../services/moderationService';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
   { id: 'stores', label: 'Stores & APIs', icon: Store, path: '/admin/stores' },
   { id: 'payments', label: 'Revenue & Payments', icon: DollarSign, path: '/admin/payments' },
   { id: 'products', label: 'Products', icon: Box, path: '/admin/products' },
+  { id: 'reports', label: 'Reports & Moderation', icon: Flag, path: '/admin/reports' },
   { id: 'users', label: 'Users', icon: Users, path: '/admin/users' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
   { id: 'search', label: 'Search Engine', icon: Search, path: '/admin/search' },
@@ -65,6 +68,7 @@ export default function AdminLayout() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [adminSearch, setAdminSearch] = useState('');
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -74,6 +78,19 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const { t, i18n } = useTranslation();
   const isRtl = isRtlLanguage(i18n.language);
+
+  useEffect(() => {
+    const syncReportsCount = () => {
+      fetchAllReports()
+        .then((list) => {
+          setPendingReportsCount(list.filter((r) => r.status === 'pending').length);
+        })
+        .catch(() => {});
+    };
+    syncReportsCount();
+    window.addEventListener(MODERATION_EVENT, syncReportsCount);
+    return () => window.removeEventListener(MODERATION_EVENT, syncReportsCount);
+  }, [location.pathname]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -242,6 +259,7 @@ export default function AdminLayout() {
     const q = adminSearch.trim().toLowerCase();
     if (!q) return;
     if (q.includes('user') || q.includes('مستخدم')) navigate('/admin/users');
+    else if (q.includes('report') || q.includes('بلاغ') || q.includes('حظر')) navigate('/admin/reports');
     else if (q.includes('prod') || q.includes('منتج')) navigate('/admin/products');
     else if (q.includes('store') || q.includes('متجر')) navigate('/admin/stores');
     else if (q.includes('pay') || q.includes('دفع') || q.includes('إيراد')) navigate('/admin/payments');
@@ -306,26 +324,38 @@ export default function AdminLayout() {
               item.path === '/admin'
                 ? location.pathname === '/admin'
                 : location.pathname.startsWith(item.path);
+            const showReportBadge = item.id === 'reports' && pendingReportsCount > 0;
 
             return (
               <NavLink
                 key={item.id}
                 to={item.path}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative ${
+                className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 group relative ${
                   isActive
                     ? 'bg-black text-white shadow-md shadow-black/10'
                     : 'text-gray-500 hover:bg-gray-100/80 hover:text-black'
                 }`}
                 title={!isSidebarOpen ? t(item.label) : undefined}
               >
-                <Icon
-                  className={`w-5 h-5 shrink-0 transition-transform ${
-                    isActive ? 'scale-110 text-[#D4AF37]' : 'group-hover:scale-110'
-                  }`}
-                />
-                {(isSidebarOpen || isMobileMenuOpen) && (
-                  <span className="font-medium text-sm whitespace-nowrap">{t(item.label)}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon
+                    className={`w-5 h-5 shrink-0 transition-transform ${
+                      isActive ? 'scale-110 text-[#D4AF37]' : 'group-hover:scale-110'
+                    }`}
+                  />
+                  {(isSidebarOpen || isMobileMenuOpen) && (
+                    <span className="font-medium text-sm whitespace-nowrap truncate">{t(item.label)}</span>
+                  )}
+                </div>
+                {showReportBadge && (
+                  <span
+                    className={`px-2 py-0.5 text-[11px] font-extrabold rounded-full shrink-0 ${
+                      isActive ? 'bg-red-500 text-white' : 'bg-red-600 text-white'
+                    }`}
+                  >
+                    {pendingReportsCount}
+                  </span>
                 )}
               </NavLink>
             );
