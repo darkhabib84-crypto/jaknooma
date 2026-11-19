@@ -3,13 +3,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   User, MapPin, Heart, Clock, Settings, LogOut, Package, 
   Wrench, ShoppingBag, Store, Plus, Activity, TrendingUp, 
-  DollarSign, Crown, Trash2, Loader2, PlusCircle 
+  DollarSign, Crown, Trash2, Loader2, PlusCircle, AlertTriangle, X 
 } from 'lucide-react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product } from './ProductCard';
+import { executeServerSideAccountDeletion } from '../services/accountDeletionService';
+import toast from 'react-hot-toast';
+import { isRtlLanguage } from '../lib/i18n';
 
 interface UserData {
   fullName?: string;
@@ -19,11 +22,15 @@ interface UserData {
 
 export default function UserProfile() {
   const { user, logout, isAdmin } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isRtl = isRtlLanguage(i18n.language);
   const location = useLocation();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('profile');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
   
   // بيانات المنتجات والمبيعات الحقيقية
   const [myProducts, setMyProducts] = useState<Product[]>([]);
@@ -181,11 +188,42 @@ export default function UserProfile() {
         fullName: profileData.fullName,
         phone: profileData.phone
       });
-      alert(t('Profile updated successfully!'));
+      toast.success(t('Profile updated successfully!'));
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast.error(isRtl ? 'تعذر تحديث الملف الشخصي' : 'Failed to update profile');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const isDeleteConfirmationValid = () => {
+    const normalized = deleteConfirmText.trim().toUpperCase();
+    return normalized === 'DELETE' || deleteConfirmText.trim() === 'حذف';
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (!user || !isDeleteConfirmationValid() || deletingAccount) return;
+    setDeletingAccount(true);
+    try {
+      await executeServerSideAccountDeletion();
+      toast.success(
+        isRtl
+          ? 'تم حذف حسابك وجميع بياناتك وإعلاناتك نهائياً.'
+          : 'Your account and all personal data have been permanently deleted.'
+      );
+      setShowDeleteModal(false);
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      console.error('Account deletion error:', err);
+      toast.error(
+        err?.message ||
+          (isRtl
+            ? 'تعذر حذف الحساب حالياً. يرجى إعادة تسجيل الدخول والمحاولة مرة أخرى.'
+            : 'Failed to delete account. Please sign in again and retry.')
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -383,6 +421,34 @@ export default function UserProfile() {
                         {t('Save Changes')}
                       </button>
                     </div>
+
+                    {/* Danger Zone: In-App Account Deletion (Apple Guideline 5.1.1(v) & Google Play) */}
+                    <div className="pt-8 mt-8 border-t border-red-100">
+                      <div className="bg-red-50/70 border border-red-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <h3 className="text-base font-bold text-red-700 flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 shrink-0" />
+                            {isRtl ? 'حذف حسابي نهائياً (Delete My Account)' : 'Delete My Account'}
+                          </h3>
+                          <p className="text-xs text-red-600/90 leading-relaxed max-w-xl">
+                            {isRtl
+                              ? 'سيؤدي حذف حسابك إلى إزالة ملفك الشخصي وبريدك الإلكتروني ورقم هاتفك وجميع إعلاناتك وصورك المرفوعة نهائياً وإلغاء ربط الدخول مع Apple / Google.'
+                              : 'Permanently delete your account, profile details, email, phone number, published ads, uploaded images, and revoke Sign in with Apple / Google tokens.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteConfirmText('');
+                            setShowDeleteModal(true);
+                          }}
+                          className="shrink-0 bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-5 py-3 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {isRtl ? 'حذف حسابي' : 'Delete my account'}
+                        </button>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -561,6 +627,109 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
+
+      {/* Account Deletion Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-red-100">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-red-50/50">
+              <div className="flex items-center gap-2.5 text-red-700">
+                <AlertTriangle className="w-6 h-6 shrink-0" />
+                <h2 className="text-lg font-bold">
+                  {isRtl ? 'تأكيد حذف الحساب نهائياً' : 'Confirm Permanent Account Deletion'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => !deletingAccount && setShowDeleteModal(false)}
+                className="p-2 text-gray-400 hover:text-black hover:bg-white rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {isRtl
+                  ? 'هذا الإجراء نهائي ولا يمكن التراجع عنه. سيتم حذف البيانات التالية من خوادمنا فوراً:'
+                  : 'This action is permanent and cannot be undone. The following data will be permanently deleted from our servers:'}
+              </p>
+
+              <ul className="text-xs text-gray-600 space-y-1.5 bg-gray-50 p-4 rounded-2xl border border-gray-100 list-disc list-inside">
+                <li>
+                  {isRtl
+                    ? 'حساب الدخول، البريد الإلكتروني، رقم الهاتف، والعناوين المحفوظة'
+                    : 'Your login account, profile, email address, phone number, and saved addresses'}
+                </li>
+                <li>
+                  {isRtl
+                    ? 'جميع إعلاناتك ومنتجاتك المنشورة وصورها المرفوعة'
+                    : 'All of your published ads/products and uploaded images'}
+                </li>
+                <li>
+                  {isRtl
+                    ? 'قائمة المفضلة وعربة التسوق ورموز الدخول (بما في ذلك إلغاء رمز Apple)'
+                    : 'Your wishlist, shopping list, and saved tokens (including revoking Sign in with Apple)'}
+                </li>
+              </ul>
+
+              <p className="text-[11px] text-gray-500 leading-relaxed">
+                {isRtl
+                  ? 'ملاحظة قانونية: يتم الاحتفاظ بسجلات المدفوعات المالية السابقة بشكل مجهول الهوية تماماً (بدون اسم أو بريد إلكتروني) للامتثال لمتطلبات المحاسبة والضرائب القانونية فقط.'
+                  : 'Legal note: Completed payment transaction amounts are retained in strictly anonymized form (scrubbed of name and email) solely for tax and accounting compliance.'}
+              </p>
+
+              <div className="pt-2">
+                <label className="block text-xs font-bold text-gray-700 mb-2">
+                  {isRtl
+                    ? 'لتأكيد الحذف، اكتب كلمة DELETE أو حذف في الحقل أدناه:'
+                    : 'To confirm, type DELETE in the field below:'}
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={isRtl ? 'DELETE أو حذف' : 'DELETE'}
+                  disabled={deletingAccount}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-black focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/10 outline-none transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  type="button"
+                  disabled={deletingAccount}
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!isDeleteConfirmationValid() || deletingAccount}
+                  onClick={handleConfirmDeleteAccount}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {deletingAccount ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {isRtl ? 'جاري الحذف...' : 'Deleting...'}
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      {isRtl ? 'تأكيد حذف الحساب' : 'Permanently Delete'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

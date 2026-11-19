@@ -36,6 +36,7 @@ import ApiMonitoring from './components/admin/ApiMonitoring';
 import ProductDetails from './pages/ProductDetails';
 import Checkout from './pages/Checkout';
 import SellerProfile from './pages/SellerProfile';
+import DeleteAccount from './pages/DeleteAccount';
 import { usePageTracking } from './hooks/usePageTracking';
 
 function ScrollToTop() {
@@ -114,6 +115,7 @@ function AppContent() {
           <Route path="/seller/:sellerId" element={<SellerProfile />} />
 
           <Route path="/terms" element={<Terms />} />
+          <Route path="/delete-account" element={<DeleteAccount />} />
           <Route path="/add-product" element={<AddProductForm />} />
           <Route path="/profile" element={<UserProfile />} />
           <Route path="/orders" element={<UserProfile />} />

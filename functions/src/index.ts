@@ -1,12 +1,23 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import Stripe from "stripe";
 import express from "express";
 import cors from "cors";
 
+// Server-side secrets for Sign in with Apple Token Revocation (.p8 private key)
+// Never exposed to client code.
+const appleTeamIdSecret = defineSecret("APPLE_TEAM_ID");
+const appleKeyIdSecret = defineSecret("APPLE_KEY_ID");
+const appleClientIdSecret = defineSecret("APPLE_CLIENT_ID");
+const applePrivateKeySecret = defineSecret("APPLE_PRIVATE_KEY");
+
 // تهيئة Firebase Admin
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: "2026-06-24.dahlia",
@@ -157,8 +168,334 @@ app.get("/verify-stripe-session", async (req, res) => {
   }
 });
 
+/**
+ * Generates an ES256 client_secret JWT signed with the Apple .p8 private key
+ * stored in server-side Cloud Functions secrets (never in client code).
+ */
+function generateAppleClientSecret(params: {
+  teamId: string;
+  keyId: string;
+  clientId: string;
+  privateKeyPem: string;
+}): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: "ES256",
+    kid: params.keyId,
+    typ: "JWT",
+  };
+  const payload = {
+    iss: params.teamId,
+    iat: now,
+    exp: now + 300, // 5 minutes validity
+    aud: "https://appleid.apple.com",
+    sub: params.clientId,
+  };
+
+  const base64UrlEncode = (input: Buffer | string) =>
+    Buffer.from(input)
+      .toString("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const normalizedKey = params.privateKeyPem.replace(/\\n/g, "\n").trim();
+  const signature = crypto.sign("sha256", Buffer.from(signingInput), {
+    key: normalizedKey,
+    dsaEncoding: "ieee-p1363",
+  });
+
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+/**
+ * Exchanges an Apple authorization_code (if provided) and revokes the Apple token
+ * via https://appleid.apple.com/auth/revoke as required by Apple Guideline 5.1.1(v).
+ */
+async function revokeAppleTokenServerSide(options: {
+  authorizationCode?: string;
+  refreshToken?: string;
+  accessToken?: string;
+}): Promise<{ attempted: boolean; revoked: boolean; reason?: string }> {
+  const teamId = (appleTeamIdSecret.value() || process.env.APPLE_TEAM_ID || "").trim();
+  const keyId = (appleKeyIdSecret.value() || process.env.APPLE_KEY_ID || "").trim();
+  const clientId = (appleClientIdSecret.value() || process.env.APPLE_CLIENT_ID || "com.jaknooma.app").trim();
+  const privateKeyPem = (applePrivateKeySecret.value() || process.env.APPLE_PRIVATE_KEY || "").trim();
+
+  if (!teamId || !keyId || !privateKeyPem) {
+    logger.warn("Apple .p8 secrets (APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY) are not configured yet.");
+    return {
+      attempted: false,
+      revoked: false,
+      reason: "apple_secrets_not_configured",
+    };
+  }
+
+  const clientSecret = generateAppleClientSecret({
+    teamId,
+    keyId,
+    clientId,
+    privateKeyPem,
+  });
+
+  let tokenToRevoke = options.refreshToken || options.accessToken || "";
+  let tokenTypeHint: "refresh_token" | "access_token" = options.refreshToken
+    ? "refresh_token"
+    : "access_token";
+
+  if (!tokenToRevoke && options.authorizationCode) {
+    const tokenParams = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code: options.authorizationCode,
+      grant_type: "authorization_code",
+    });
+
+    const tokenResp = await fetch("https://appleid.apple.com/auth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: tokenParams.toString(),
+    });
+
+    if (tokenResp.ok) {
+      const tokenJson = (await tokenResp.json()) as {
+        refresh_token?: string;
+        access_token?: string;
+      };
+      if (tokenJson.refresh_token) {
+        tokenToRevoke = tokenJson.refresh_token;
+        tokenTypeHint = "refresh_token";
+      } else if (tokenJson.access_token) {
+        tokenToRevoke = tokenJson.access_token;
+        tokenTypeHint = "access_token";
+      }
+    } else {
+      const errText = await tokenResp.text();
+      logger.warn(`Apple auth/token exchange returned ${tokenResp.status}: ${errText}`);
+    }
+  }
+
+  if (!tokenToRevoke) {
+    return {
+      attempted: true,
+      revoked: false,
+      reason: "no_apple_token_or_authorization_code_provided",
+    };
+  }
+
+  const revokeParams = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    token: tokenToRevoke,
+    token_type_hint: tokenTypeHint,
+  });
+
+  const revokeResp = await fetch("https://appleid.apple.com/auth/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: revokeParams.toString(),
+  });
+
+  if (!revokeResp.ok) {
+    const errText = await revokeResp.text();
+    throw new Error(`Apple token revocation failed (${revokeResp.status}): ${errText}`);
+  }
+
+  return { attempted: true, revoked: true };
+}
+
+function extractStoragePathFromUrl(url: string): string | null {
+  if (!url || typeof url !== "string") return null;
+  try {
+    const match = url.match(/\/o\/([^?]+)/);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]);
+    }
+  } catch {
+    // ignore malformed URL
+  }
+  return null;
+}
+
+/**
+ * 3. Server-Side Account & Personal Data Deletion Endpoint (Apple 5.1.1(v) & Google Play)
+ * Strictly deletes user data FIRST, anonymizes legal accounting records, and deletes the Firebase Auth user LAST.
+ */
+app.post("/delete-account", async (req, res) => {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      success: false,
+      message: "Missing or invalid Authorization Bearer token",
+    });
+  }
+
+  const idToken = authHeader.slice("Bearer ".length).trim();
+  let decodedToken: admin.auth.DecodedIdToken;
+  try {
+    decodedToken = await admin.auth().verifyIdToken(idToken, true);
+  } catch (err: any) {
+    logger.error("verifyIdToken failed on /delete-account:", err?.message);
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized or expired session token. Please sign in again.",
+    });
+  }
+
+  const uid = decodedToken.uid;
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+
+  try {
+    const userRecord = await admin.auth().getUser(uid);
+    const providers = userRecord.providerData.map((p) => p.providerId);
+    const isAppleUser = providers.includes("apple.com");
+
+    // Step 1: If user signed in with Apple, revoke Sign in with Apple token via server-side .p8 key
+    let appleRevocationResult: { attempted: boolean; revoked: boolean; reason?: string } = {
+      attempted: false,
+      revoked: false,
+    };
+    if (isAppleUser) {
+      appleRevocationResult = await revokeAppleTokenServerSide({
+        authorizationCode: req.body?.appleAuthorizationCode,
+        refreshToken: req.body?.appleRefreshToken,
+        accessToken: req.body?.appleAccessToken,
+      });
+    }
+
+    // Step 2: Delete user's products/ads and collect all image storage paths
+    const productsSnap = await db.collection("products").where("sellerId", "==", uid).get();
+    const storagePathsToDelete = new Set<string>();
+    let deletedProductsCount = 0;
+
+    for (const prodDoc of productsSnap.docs) {
+      const prodData = prodDoc.data();
+      if (Array.isArray(prodData.images)) {
+        for (const imgUrl of prodData.images) {
+          const parsedPath = extractStoragePathFromUrl(imgUrl);
+          if (parsedPath) {
+            storagePathsToDelete.add(parsedPath);
+          }
+        }
+      }
+      await prodDoc.ref.delete();
+      deletedProductsCount++;
+    }
+
+    // Step 3: Delete all files in Firebase Storage under products/{uid}/ and referenced paths
+    let deletedImagesCount = 0;
+    try {
+      const [filesByPrefix] = await bucket.getFiles({ prefix: `products/${uid}/` });
+      for (const file of filesByPrefix) {
+        storagePathsToDelete.add(file.name);
+      }
+    } catch (storageListErr: any) {
+      logger.warn(`Storage prefix listing warning for products/${uid}/: ${storageListErr?.message}`);
+    }
+
+    for (const storagePath of storagePathsToDelete) {
+      try {
+        await bucket.file(storagePath).delete({ ignoreNotFound: true });
+        deletedImagesCount++;
+      } catch (fileDelErr: any) {
+        logger.warn(`Failed to delete storage object ${storagePath}: ${fileDelErr?.message}`);
+      }
+    }
+
+    // Step 4: Delete user's wishlists, cart items, and reviews
+    const collectionsByUserId = ["wishlist", "cart", "reviews"];
+    for (const colName of collectionsByUserId) {
+      const snap = await db.collection(colName).where("userId", "==", uid).get();
+      for (const docSnap of snap.docs) {
+        await docSnap.ref.delete();
+      }
+    }
+
+    // Delete /users/{uid}/wishlists subcollection
+    const subWishlistsSnap = await db.collection("users").doc(uid).collection("wishlists").get();
+    for (const subDoc of subWishlistsSnap.docs) {
+      await subDoc.ref.delete();
+    }
+
+    // Step 5: Anonymize legal accounting/payment records in /payments & /orders (keep amounts for tax/accounting law, scrub PII)
+    const anonymizedId = `deleted_${crypto.createHash("sha256").update(uid).digest("hex").slice(0, 12)}`;
+    const paymentsSnap = await db.collection("payments").where("userId", "==", uid).get();
+    let anonymizedPaymentsCount = 0;
+    for (const payDoc of paymentsSnap.docs) {
+      await payDoc.ref.update({
+        userId: anonymizedId,
+        userEmail: "[deleted]",
+        userName: "Deleted User",
+        anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      anonymizedPaymentsCount++;
+    }
+
+    const ordersBuyerSnap = await db.collection("orders").where("userId", "==", uid).get();
+    for (const ordDoc of ordersBuyerSnap.docs) {
+      await ordDoc.ref.update({
+        userId: anonymizedId,
+        userEmail: "[deleted]",
+        userName: "Deleted User",
+        anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    const ordersSellerSnap = await db.collection("orders").where("sellerId", "==", uid).get();
+    for (const ordDoc of ordersSellerSnap.docs) {
+      await ordDoc.ref.update({
+        sellerId: anonymizedId,
+        sellerEmail: "[deleted]",
+        sellerName: "Deleted User",
+        anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Step 6: Delete user profile document /users/{uid} and /admins/{uid}
+    await db.collection("users").doc(uid).delete();
+    await db.collection("admins").doc(uid).delete().catch(() => {});
+
+    // Step 7: Revoke refresh tokens & delete Firebase Auth user LAST so any earlier failure can be safely retried
+    await admin.auth().revokeRefreshTokens(uid);
+    await admin.auth().deleteUser(uid);
+
+    logger.info(
+      `Account ${uid} permanently deleted. Ads removed: ${deletedProductsCount}, images removed: ${deletedImagesCount}, payments anonymized: ${anonymizedPaymentsCount}`
+    );
+
+    return res.json({
+      success: true,
+      deletedProductsCount,
+      deletedImagesCount,
+      anonymizedPaymentsCount,
+      appleRevocation: appleRevocationResult,
+    });
+  } catch (error: any) {
+    logger.error(`Account deletion failed for ${uid}: ${error?.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error?.message || "Failed to complete server-side account deletion",
+    });
+  }
+});
+
 // تصدير دالة الـ API لتعمل مع توجيه /api/** في firebase.json
-export const api = onRequest(app);
+export const api = onRequest(
+  {
+    secrets: [
+      appleTeamIdSecret,
+      appleKeyIdSecret,
+      appleClientIdSecret,
+      applePrivateKeySecret,
+    ],
+  },
+  app
+);
 
 // 2. نقطة النهاية الخاصة بـ Stripe Webhook
 export const stripeWebhook = onRequest(async (req, res) => {

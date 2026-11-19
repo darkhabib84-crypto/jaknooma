@@ -5,10 +5,12 @@ import {
   signOut,
   OAuthProvider,
   signInWithPopup,
-  signInWithRedirect
+  signInWithRedirect,
+  signInWithCredential
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
   checkUserBannedAsync,
@@ -107,8 +109,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      const result = await signInWithPopup(auth, provider);
-      const loggedInUser = result.user;
+      let loggedInUser: User | null = null;
+
+      if (Capacitor.isNativePlatform()) {
+        const nativeResult = await FirebaseAuthentication.signInWithApple({
+          scopes: ['email', 'name'],
+        });
+        const idToken = nativeResult.credential?.idToken;
+        const rawNonce = nativeResult.credential?.nonce;
+        if (!idToken) {
+          throw new Error('لم يتم استلام رمز المصادقة من Apple');
+        }
+        const credential = provider.credential({ idToken, rawNonce });
+        const result = await signInWithCredential(auth, credential);
+        loggedInUser = result.user;
+      } else {
+        const result = await signInWithPopup(auth, provider);
+        loggedInUser = result.user;
+      }
 
       if (loggedInUser) {
         try {
@@ -142,6 +160,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await FirebaseAuthentication.signOut();
+      } catch (e) {
+        console.warn('Native FirebaseAuthentication.signOut warning:', e);
+      }
+    }
     await signOut(auth);
   };
 

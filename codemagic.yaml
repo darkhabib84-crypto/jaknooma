@@ -89,7 +89,15 @@ workflows:
           if [ ! -d "ios" ]; then
             npx cap add ios
           fi
-          npx cap sync ios
+          rm -f ios/App/Podfile.lock
+          npx cap sync ios --no-pod-install || npx cap sync ios
+          # Ensure GoogleSignIn 7.1.0+, GTMAppAuth 4.1.1+, and GTMSessionFetcher 3.5.0+ with PrivacyInfo.xcprivacy
+          if ! grep -q "CapacitorFirebaseAuthentication/Google" ios/App/Podfile; then
+            sed -i '' "s|# Add your Pods here|# Add your Pods here\n  pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'\n  pod 'GoogleSignIn', '~> 7.1.0'\n  pod 'GTMAppAuth', '~> 4.1.1'\n  pod 'GTMSessionFetcher/Core', '~> 3.5.0'|" ios/App/Podfile
+          fi
+          cd ios/App
+          pod repo update
+          pod install --repo-update
       - name: Set app icon
         script: |
           ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
@@ -99,7 +107,13 @@ workflows:
           cat "$ICON_DIR/Contents.json"
       - name: Set build number
         script: |
-          sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/" ios/App/App.xcodeproj/project.pbxproj
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 5)
+          if [ -z "$LATEST_BUILD_NUMBER" ] || [ "$LATEST_BUILD_NUMBER" -lt 5 ]; then
+            LATEST_BUILD_NUMBER=5
+          fi
+          NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          echo "Setting iOS CURRENT_PROJECT_VERSION to $NEXT_BUILD_NUMBER (latest was $LATEST_BUILD_NUMBER)"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = $NEXT_BUILD_NUMBER;/" ios/App/App.xcodeproj/project.pbxproj
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build ipa

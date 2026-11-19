@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
@@ -20,8 +20,6 @@ import { useTranslation } from 'react-i18next';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
-
-const WEB_CLIENT_ID = '215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com';
 
 export default function AuthModal() {
   const { isAuthModalOpen, authModalMode, closeAuthModal } = useAuth();
@@ -50,16 +48,8 @@ export default function AuthModal() {
     });
   };
 
-  // تهيئة إضافة Google Auth للأندرويد ومعالجة نتيجة Redirect (سواء من Google أو Apple) إن وجدت
+  // معالجة نتيجة Redirect (سواء من Google أو Apple) إن وجدت على الويب
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      GoogleAuth.initialize({
-        clientId: WEB_CLIENT_ID,
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
-      });
-    }
-
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
@@ -143,26 +133,23 @@ export default function AuthModal() {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // 1. تسجيل الدخول الأصلي السريع داخل تطبيق الأندرويد / iOS
-        GoogleAuth.initialize({
-          clientId: WEB_CLIENT_ID,
+        // 1. تسجيل الدخول الأصلي السريع داخل تطبيق iOS / Android عبر @capacitor-firebase/authentication
+        const nativeResult = await FirebaseAuthentication.signInWithGoogle({
           scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
         });
+        const idToken = nativeResult.credential?.idToken;
+        const accessToken = nativeResult.credential?.accessToken;
 
-        const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser?.authentication?.idToken;
-
-        if (!idToken) {
+        if (!idToken && !accessToken) {
           throw new Error('لم يتم استلام رمز المصادقة من Google');
         }
 
-        const credential = GoogleAuthProvider.credential(idToken);
+        const credential = GoogleAuthProvider.credential(idToken ?? null, accessToken);
         const result = await signInWithCredential(auth, credential);
 
         await saveUserProfile(result.user.uid, {
-          email: result.user.email || '',
-          name: result.user.displayName || googleUser.name || "Google User",
+          email: result.user.email || nativeResult.user?.email || '',
+          name: result.user.displayName || nativeResult.user?.displayName || "Google User",
           provider: 'google'
         });
 
@@ -209,6 +196,36 @@ export default function AuthModal() {
     setLoading(true);
 
     try {
+      if (Capacitor.isNativePlatform()) {
+        // 1. تسجيل الدخول الأصلي عبر Apple على iOS / Android باستخدام @capacitor-firebase/authentication
+        const nativeResult = await FirebaseAuthentication.signInWithApple({
+          scopes: ['email', 'name'],
+        });
+        const idToken = nativeResult.credential?.idToken;
+        const rawNonce = nativeResult.credential?.nonce;
+
+        if (!idToken) {
+          throw new Error('لم يتم استلام رمز المصادقة من Apple');
+        }
+
+        const provider = new OAuthProvider('apple.com');
+        const credential = provider.credential({
+          idToken,
+          rawNonce,
+        });
+        const result = await signInWithCredential(auth, credential);
+
+        await saveUserProfile(result.user.uid, {
+          email: result.user.email || nativeResult.user?.email || '',
+          name: result.user.displayName || nativeResult.user?.displayName || result.user.email?.split('@')[0] || "Apple User",
+          provider: 'apple'
+        });
+
+        toast.success(t('Welcome Back'));
+        closeAuthModal();
+        return;
+      }
+
       const provider = new OAuthProvider('apple.com');
       provider.addScope('email');
       provider.addScope('name');

@@ -8,10 +8,9 @@ const config: CapacitorConfig = {
     androidScheme: 'https'
   },
   plugins: {
-    GoogleAuth: {
-      scopes: ['profile', 'email'],
-      serverClientId: '215148796185-e5gae926ms56t6vtgmt0hdlah12s8s6i.apps.googleusercontent.com',
-      forceCodeForRefreshToken: true
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ['google.com', 'apple.com']
     }
   }
 };
