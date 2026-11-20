@@ -74,6 +74,8 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.jaknooma.app
+      vars:
+        APP_STORE_APPLE_ID: 6815376945
     scripts:
       - name: Install dependencies
         script: npm install
@@ -90,14 +92,35 @@ workflows:
             npx cap add ios
           fi
           rm -f ios/App/Podfile.lock
-          npx cap sync ios --no-pod-install || npx cap sync ios
-          # Ensure GoogleSignIn 7.1.0+, GTMAppAuth 4.1.1+, and GTMSessionFetcher 3.5.0+ with PrivacyInfo.xcprivacy
-          if ! grep -q "CapacitorFirebaseAuthentication/Google" ios/App/Podfile; then
-            sed -i '' "s|# Add your Pods here|# Add your Pods here\n  pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'\n  pod 'GoogleSignIn', '~> 7.1.0'\n  pod 'GTMAppAuth', '~> 4.1.1'\n  pod 'GTMSessionFetcher/Core', '~> 3.5.0'|" ios/App/Podfile
-          fi
+          npx cap sync ios
+      - name: Patch Podfile (privacy manifest versions)
+        script: |
+          python3 - <<'PY'
+          p = "ios/App/Podfile"
+          s = open(p).read()
+          marker = "# Add your Pods here"
+          pods = [
+              "pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'",
+              "pod 'GoogleSignIn', '~> 7.1.0'",
+              "pod 'GTMAppAuth', '~> 4.1.1'",
+              "pod 'GTMSessionFetcher/Core', '~> 3.5.0'",
+          ]
+          if marker not in s:
+              print("WARNING: marker not found in Podfile")
+          for l in pods:
+              name = l.split("'")[1]
+              if "pod '" + name + "'" not in s:
+                  s = s.replace(marker, marker + "\n  " + l, 1)
+          open(p, "w").write(s)
+          PY
+          cat ios/App/Podfile
+      - name: Install CocoaPods
+        script: |
           cd ios/App
-          pod repo update
           pod install --repo-update
+      - name: Verify pod versions
+        script: |
+          grep -E "GoogleSignIn|GTMAppAuth|GTMSessionFetcher" ios/App/Podfile.lock || true
       - name: Set app icon
         script: |
           ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
@@ -121,6 +144,7 @@ workflows:
           xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
