@@ -88,11 +88,20 @@ workflows:
           fi
       - name: Setup Capacitor iOS
         script: |
-          if [ ! -d "ios" ]; then
-            npx cap add ios
+          if [ ! -d "ios/App/App.xcodeproj" ]; then
+            echo "iOS project missing or incomplete, recreating it"
+            if [ -d "ios" ]; then
+              mv ios ios_partial_backup
+            fi
+            npx cap add ios --no-pod-install || npx cap add ios
+            if [ -d "ios_partial_backup" ]; then
+              cp -Rn ios_partial_backup/. ios/ || true
+              rm -rf ios_partial_backup
+            fi
           fi
           rm -f ios/App/Podfile.lock
-          npx cap sync ios
+          npx cap sync ios --no-pod-install || npx cap sync ios
+          ls -la ios/App
       - name: Patch Podfile (privacy manifest versions)
         script: |
           python3 - <<'PY'
