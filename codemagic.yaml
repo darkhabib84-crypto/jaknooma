@@ -105,23 +105,34 @@ workflows:
       - name: Patch Podfile (privacy manifest versions)
         script: |
           python3 - <<'PY'
+          import re
           p = "ios/App/Podfile"
           s = open(p).read()
+
+          # رفع الحد الأدنى لنسخة الآيفون
+          s = re.sub(r"platform :ios, '[0-9.]+'", "platform :ios, '15.0'", s)
+
+          # حذف أي أسطر قديمة مثبتة لهذي المكتبات
+          s = re.sub(r"^[ \t]*pod '(GoogleSignIn|GTMAppAuth|GTMSessionFetcher/Core)'.*\n", "", s, flags=re.M)
+
           marker = "# Add your Pods here"
-          pods = [
-              "pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'",
-              "pod 'GoogleSignIn', '~> 7.1.0'",
-              "pod 'GTMAppAuth', '~> 4.1.1'",
-              "pod 'GTMSessionFetcher/Core', '~> 3.5.0'",
+          lines = []
+          if "CapacitorFirebaseAuthentication/Google" not in s:
+              lines.append("pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'")
+          lines += [
+              "pod 'GoogleSignIn', '>= 7.1.0'",
+              "pod 'GTMAppAuth', '>= 4.1.1'",
+              "pod 'GTMSessionFetcher/Core', '>= 3.5.0'",
           ]
-          if marker not in s:
+
+          if marker in s:
+              s = s.replace(marker, marker + "".join("\n  " + l for l in lines), 1)
+          else:
               print("WARNING: marker not found in Podfile")
-          for l in pods:
-              name = l.split("'")[1]
-              if "pod '" + name + "'" not in s:
-                  s = s.replace(marker, marker + "\n  " + l, 1)
+
           open(p, "w").write(s)
           PY
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/" ios/App/App.xcodeproj/project.pbxproj
           cat ios/App/Podfile
       - name: Install CocoaPods
         script: |
