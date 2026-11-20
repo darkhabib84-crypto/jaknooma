@@ -137,6 +137,7 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App
+          rm -rf Podfile.lock Pods
           pod install --repo-update
       - name: Verify pod versions
         script: |
