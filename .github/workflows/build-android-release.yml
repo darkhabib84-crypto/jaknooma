@@ -58,6 +58,10 @@ jobs:
 
           sed -i -E 's/minSdkVersion\s*=\s*[0-9]+/minSdkVersion = 24/g' android/variables.gradle
           sed -i -E 's/minSdkVersion\s+rootProject\.ext\.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
+          sed -i -E 's/compileSdkVersion\s*=\s*[0-9]+/compileSdkVersion = 36/g' android/variables.gradle
+          sed -i -E 's/targetSdkVersion\s*=\s*[0-9]+/targetSdkVersion = 36/g' android/variables.gradle
+          echo "android.suppressUnsupportedCompileSdk=36" >> android/gradle.properties
+          grep -E "SdkVersion" android/variables.gradle
 
       - name: Decode keystore strictly from GitHub Secrets
         run: |
